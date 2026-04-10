@@ -7,6 +7,7 @@ There is **no** custom taxonomy in this version—only the post type, panel meta
 ## Requirements
 
 - **WordPress** with a working media library (the admin picker uses the core **`wp.media`** modal).
+- **Admin Tagify** loads **[Tagify](https://github.com/yairEO/tagify)** from **jsDelivr** (HTTPS). Restrictive CSPs or offline admin may need to allow that host or bundle assets locally.
 - **Elementor** (the plugin hooks `elementor/widgets/register`). The Elementor widget class file is loaded only when that hook runs, so the base plugin does not fatal if Elementor is inactive.
 
 ## Installation
@@ -23,7 +24,8 @@ If you used an earlier copy of this plugin that stored images under **`_virtual_
 
 ### Bootstrap: `virtual-card-elementor.php`
 
-Defines constants, loads classes, runs `Plugin::instance()->run()`.
+- Defines **`VCE_VERSION`** from the **`Version`** field in this file’s plugin header via **`get_file_data()`**, so the header stays the single source of truth for the release number.
+- Defines path/url constants, text domain, loads PHP class files, runs `Plugin::instance()->run()`.
 
 **Custom post type `virtual_card` (`Post_Type` on `init`)**
 
@@ -48,6 +50,15 @@ Defines constants, loads classes, runs `Plugin::instance()->run()`.
 
 Runs only if the panel nonce is present and verifies. If **`virtual_card_panel_ids`** is non-empty, IDs are sanitized and stored; otherwise meta is deleted. REST-only saves that omit the metabox POST fields do not change `_virtual_card_panels`.
 
+**Virtual Cards admin list (`Virtual_Card_Admin_Columns`)**
+
+On **Virtual Cards → All Virtual Cards**, two columns are inserted after **Title**:
+
+| Column | Meaning |
+|--------|---------|
+| **No. of cards** | Always **`1`** for each row (one Virtual Card post = one card). |
+| **No. of panels** | Count of attachment IDs stored in **`_virtual_card_panels`** for that post. |
+
 **Elementor**
 
 - Hook: `elementor/widgets/register` registers **`Card_Panels_Widget`** from `elementor/class-card-panels-widget.php`.
@@ -65,6 +76,13 @@ Runs only if the panel nonce is present and verifies. If **`virtual_card_panel_i
 
 Use the widget where the main queried post is the desired `virtual_card` (e.g. single template for that CPT).
 
+**Media library: attachment tags (`Attachment_Tags`)**
+
+- Adds a **Tags** field on attachment details **immediately after File URL** (media modal sidebar, **Media → Library**, and when editing an attachment in **post.php**).
+- Values are stored in post meta **`_vce_attachment_tags`** as a comma-separated list (max 50 tags, 100 characters each), sanitized on save. JSON payloads from Tagify are normalized the same way.
+- **[Tagify](https://github.com/yairEO/tagify)** provides the tag UI; typing triggers debounced **`admin-ajax.php?action=vce_suggest_attachment_tags`** (nonce + `upload_files` capability) to suggest existing tags. Suggestions are built from other attachments’ meta and cached in a short-lived transient.
+- Scripts: **`assets/js/admin-attachment-tags.js`** (patches `wp.media.view.Attachment.Details` / `TwoColumn` so Tagify initializes after each render). Styles: **`assets/css/admin-attachment-tags.css`**.
+
 ## File layout
 
 | Path | Role |
@@ -75,12 +93,16 @@ Use the widget where the main queried post is the desired `virtual_card` (e.g. s
 | `includes/class-panel-meta.php` | Meta key constant |
 | `includes/class-template.php` | Template loader |
 | `admin/class-panel-meta-box.php` | Admin meta box + save + asset enqueue |
+| `admin/class-virtual-card-admin-columns.php` | Virtual Cards list table columns |
+| `admin/class-attachment-tags.php` | Attachment Tags field + AJAX + Tagify enqueue |
 | `elementor/class-card-panels-widget.php` | Elementor widget |
 | `templates/admin/panel-meta-box.php` | Admin markup |
 | `templates/frontend/card-panels.php` | Frontend markup |
 | `assets/css/admin-panel.css` | Admin styles |
 | `assets/css/frontend-panel.css` | Widget styles |
 | `assets/js/admin-panel.js` | Admin media picker UI |
+| `assets/js/admin-attachment-tags.js` | Tagify + media modal attachment details |
+| `assets/css/admin-attachment-tags.css` | Tagify layout in media sidebar |
 
 ## Example: query virtual cards in PHP
 

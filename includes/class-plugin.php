@@ -7,12 +7,17 @@
 
 namespace Virtual_Card_Elementor;
 
+use Virtual_Card_Elementor\Admin\Attachment_Tags;
 use Virtual_Card_Elementor\Admin\Panel_Meta_Box;
+use Virtual_Card_Elementor\Admin\Virtual_Card_Admin_Columns;
 use Virtual_Card_Elementor\Elementor\Card_Panels_Widget;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+require_once VCE_PLUGIN_DIR . 'admin/class-virtual-card-admin-columns.php';
+require_once VCE_PLUGIN_DIR . 'admin/class-attachment-tags.php';
 
 /**
  * Loads components and hooks.
@@ -47,6 +52,12 @@ class Plugin {
 
 		$panels = new Panel_Meta_Box();
 		$panels->register_hooks();
+
+		$list_columns = new Virtual_Card_Admin_Columns();
+		$list_columns->register_hooks();
+
+		$attachment_tags = new Attachment_Tags();
+		$attachment_tags->register_hooks();
 
 		add_action( 'elementor/widgets/register', [ $this, 'register_elementor_widget' ] );
 		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_elementor_frontend_assets' ] );
