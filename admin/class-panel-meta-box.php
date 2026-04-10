@@ -62,7 +62,12 @@ class Panel_Meta_Box {
 			return;
 		}
 
-		wp_enqueue_media();
+		$post_id = 0;
+		if ( 'post.php' === $hook_suffix && isset( $_GET['post'] ) ) {
+			$post_id = (int) $_GET['post'];
+		}
+
+		wp_enqueue_media( [ 'post' => $post_id ] );
 
 		wp_enqueue_style(
 			'vce-admin-panel',
@@ -74,7 +79,7 @@ class Panel_Meta_Box {
 		wp_enqueue_script(
 			'vce-admin-panel',
 			VCE_PLUGIN_URL . 'assets/js/admin-panel.js',
-			[ 'jquery', 'wp-media' ],
+			[ 'jquery', 'media-editor' ],
 			VCE_VERSION,
 			true
 		);
