@@ -1,13 +1,13 @@
 # Virtual Card Elementor
 
-Minimal WordPress plugin that registers the **`virtual_card`** post type, stores a **multi-image gallery** in post meta, and registers an **Elementor** widget that outputs that gallery for whatever post is current in the loop.
+Minimal WordPress plugin that registers the **`virtual_card`** post type, stores **Card Panels** (attachment IDs) in post meta, and registers an **Elementor** widget named **Card Panels** that outputs those images for whatever post is current in the loop.
 
-There is **no** custom taxonomy in this version—only the post type, gallery meta, and the widget.
+There is **no** custom taxonomy in this version—only the post type, panel meta, and the widget.
 
 ## Requirements
 
-- **WordPress** with a working media library (the gallery UI uses `wp.media`).
-- **Elementor** (the plugin hooks `elementor/widgets/register` and instantiates `\Elementor\Widget_Base`). There is **no** `class_exists( '\Elementor\Plugin' )` guard; if Elementor is deactivated, PHP may error when that hook runs.
+- **WordPress** with a working media library (the admin picker uses the core **`wp.media`** modal).
+- **Elementor** (the plugin hooks `elementor/widgets/register`). The Elementor widget class file is loaded only when that hook runs, so the base plugin does not fatal if Elementor is inactive.
 
 ## Installation
 
@@ -15,86 +15,82 @@ There is **no** custom taxonomy in this version—only the post type, gallery me
 2. Activate **Virtual Card Elementor** in **Plugins**.
 3. Visit **Settings → Permalinks** and click **Save Changes** once so rewrite rules for the new post type are registered.
 
+## Upgrading from older versions
+
+If you used an earlier copy of this plugin that stored images under **`_virtual_card_gallery`** or the Elementor widget id **`virtual_card_gallery`**, re-save each Virtual Card’s **Card Panels** in the editor and replace the old widget with **Card Panels** (`card_panels`) in Elementor templates.
+
 ## What the code does
 
-### `virtual-card-elementor.php`
+### Bootstrap: `virtual-card-elementor.php`
 
-**Custom post type `virtual_card` (on `init`)**
+Defines constants, loads classes, runs `Plugin::instance()->run()`.
+
+**Custom post type `virtual_card` (`Post_Type` on `init`)**
 
 | Argument | Value |
 |----------|--------|
-| `label` | Virtual Cards |
+| `labels` | Virtual Cards / Virtual Card |
 | `public` | `true` |
-| `menu_icon` | `dashicons-format-gallery` |
+| `menu_icon` | `dashicons-images-alt2` |
 | `supports` | `title`, `editor`, `thumbnail` |
 | `show_in_rest` | `true` |
 
-WordPress defaults apply for anything not set (e.g. rewrite slug is normally the post type key `virtual_card` unless changed elsewhere).
-
-**Admin: Card Gallery meta box**
+**Admin: Card Panels meta box (`Panel_Meta_Box`)**
 
 - Hook: `add_meta_boxes`
-- Box id: `virtual_card_gallery`, title **Card Gallery**, screen `virtual_card`, context `normal`, priority `high`
-- Reads/writes meta key **`_virtual_card_gallery`**: must be an **array of attachment IDs** when saved.
-- Outputs a nonce: action `virtual_card_nonce`, field name **`virtual_card_nonce_field`**.
-- Hidden input **`virtual_card_ids`**: comma-separated attachment IDs (also updated by jQuery when using **Add Images** / remove).
-- Front-end of the box uses inline **jQuery** and **`wp.media`** with `multiple: true` to pick images; thumbnails use the **`thumbnail`** image size in the list UI.
+- Box id: `virtual_card_panels`, title **Card Panels**, screen `virtual_card`, context `normal`, priority `high`
+- Reads/writes meta key **`_virtual_card_panels`**: list of attachment IDs when saved.
+- Nonce: action `virtual_card_panel_nonce`, field **`virtual_card_panel_nonce_field`**.
+- Hidden input **`virtual_card_panel_ids`**: comma-separated attachment IDs; **`assets/js/admin-panel.js`** updates it when adding/removing rows.
+- Styles: **`assets/css/admin-panel.css`**. Markup: **`templates/admin/panel-meta-box.php`**.
 
-**Saving the gallery (`save_post_virtual_card`)**
+**Saving panels (`save_post_virtual_card` → `Panel_Meta_Box::save_panels`)**
 
-Runs only if:
+Runs only if the panel nonce is present and verifies. If **`virtual_card_panel_ids`** is non-empty, IDs are sanitized and stored; otherwise meta is deleted. REST-only saves that omit the metabox POST fields do not change `_virtual_card_panels`.
 
-- `$_POST['virtual_card_nonce_field']` is set, and  
-- `wp_verify_nonce( … , 'virtual_card_nonce' )` passes.
+**Elementor**
 
-Then:
+- Hook: `elementor/widgets/register` registers **`Card_Panels_Widget`** from `elementor/class-card-panels-widget.php`.
+- Frontend style handle **`vce-frontend-panel`** → `assets/css/frontend-panel.css`.
+- Markup: **`templates/frontend/card-panels.php`**.
 
-- If **`virtual_card_ids`** is non-empty (after `empty()`): split on commas, `intval` each part, `update_post_meta( $post_id, '_virtual_card_gallery', $ids )`.
-- **Else** (including empty string after removing all images): **`delete_post_meta( $post_id, '_virtual_card_gallery' )`**.
+| Widget | Behavior |
+|--------|----------|
+| `get_name()` | `card_panels` |
+| `get_title()` | **Card Panels** |
+| `get_icon()` | `eicon-columns` |
+| **Layout** | Columns (1–6), Limit |
+| **Style** | Gap / border radius on `.virtual-card-panels` |
+| **`render()`** | Uses **`global $post`**, reads **`_virtual_card_panels`**, outputs the panel grid for the current loop post |
 
-So saves that **do not** include the gallery nonce (typical **REST-only** / block editor flows that skip classic metabox POST data) will **not** change `_virtual_card_gallery` at all—the callback returns before any meta update.
-
-**Elementor registration**
-
-- Hook: `elementor/widgets/register`
-- `require_once` `virtual-card-widget.php` and registers `new \Virtual_Card_Widget()`.
-
-### `virtual-card-widget.php`
-
-Class **`Virtual_Card_Widget`** extends `\Elementor\Widget_Base`.
-
-| Method / area | Behavior |
-|-----------------|----------|
-| `get_name()` | `virtual_card_gallery` |
-| `get_title()` | “Virtual Card Gallery” (`__( …, 'text-domain' )` — placeholder text domain) |
-| `get_icon()` | `eicon-gallery-grid` |
-| `get_categories()` | `[ 'general' ]` |
-| **Layout controls** | **Columns**: `NUMBER`, default `3`, min `1`, max `6`. **Limit**: `NUMBER`, default `6`, min `1`. |
-| **Style controls** | Responsive **Gap** → `{{WRAPPER}} .virtual-card-gallery` → `gap`. Responsive **Border radius** → `{{WRAPPER}} .virtual-card-gallery img` → `border-radius`. |
-| **`render()`** | Uses **`global $post`**. If `$post` is missing, outputs nothing. Loads `_virtual_card_gallery`; if empty or not an array, outputs nothing. Otherwise `array_slice` to **Limit**, builds a grid: `display: grid; grid-template-columns: repeat( columns, 1fr )` on **`.virtual-card-gallery`**, each image in **`.virtual-card-item`**, `wp_get_attachment_image( …, 'large', … )` with class **`virtual-card-image`**, `loading="lazy"`, `alt` from `_wp_attachment_image_alt`. |
-
-**Important:** The widget always shows the gallery for **`$post` in the global scope**, not a post selected in the widget. Use it where the main queried post is the desired `virtual_card` (e.g. single template for that CPT).
+Use the widget where the main queried post is the desired `virtual_card` (e.g. single template for that CPT).
 
 ## File layout
 
-| File | Role |
+| Path | Role |
 |------|------|
-| `virtual-card-elementor.php` | CPT, gallery meta box + save handler, Elementor widget registration |
-| `virtual-card-widget.php` | `Virtual_Card_Widget` definition |
+| `virtual-card-elementor.php` | Bootstrap |
+| `includes/class-plugin.php` | Hooks orchestration |
+| `includes/class-post-type.php` | CPT registration |
+| `includes/class-panel-meta.php` | Meta key constant |
+| `includes/class-template.php` | Template loader |
+| `admin/class-panel-meta-box.php` | Admin meta box + save + asset enqueue |
+| `elementor/class-card-panels-widget.php` | Elementor widget |
+| `templates/admin/panel-meta-box.php` | Admin markup |
+| `templates/frontend/card-panels.php` | Frontend markup |
+| `assets/css/admin-panel.css` | Admin styles |
+| `assets/css/frontend-panel.css` | Widget styles |
+| `assets/js/admin-panel.js` | Admin media picker UI |
 
 ## Example: query virtual cards in PHP
 
 ```php
 $query = new WP_Query([
-    'post_type'      => 'virtual_card',
-    'post_status'    => 'publish',
-    'posts_per_page' => 10,
+	'post_type'      => 'virtual_card',
+	'post_status'    => 'publish',
+	'posts_per_page' => 10,
 ]);
 ```
-
-## Plugin header note
-
-The main file only declares **`Plugin Name: Virtual Card Elementor`**. There is no `Version`, `Description`, or `Text Domain` header in code; widget strings still pass `'text-domain'` to `__()`.
 
 ## License
 

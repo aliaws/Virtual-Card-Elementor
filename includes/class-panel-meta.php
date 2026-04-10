@@ -1,0 +1,20 @@
+<?php
+/**
+ * Shared panel (image set) post meta constants.
+ *
+ * @package Virtual_Card_Elementor
+ */
+
+namespace Virtual_Card_Elementor;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Panel attachment IDs stored in post meta.
+ */
+class Panel_Meta {
+
+	public const META_KEY = '_virtual_card_panels';
+}
