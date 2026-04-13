@@ -79,7 +79,7 @@ class Panel_Meta_Box {
 		wp_enqueue_script(
 			'vce-admin-panel',
 			VCE_PLUGIN_URL . 'assets/js/admin-panel.js',
-			[ 'jquery', 'media-editor' ],
+			[ 'jquery', 'jquery-ui-sortable', 'media-editor' ],
 			VCE_VERSION,
 			true
 		);
@@ -88,8 +88,18 @@ class Panel_Meta_Box {
 			'vce-admin-panel',
 			'vceAdminPanel',
 			[
-				'frameTitle'  => __( 'Select images', VCE_TEXT_DOMAIN ),
-				'removeLabel' => __( 'Remove image', VCE_TEXT_DOMAIN ),
+				'frameTitle'       => __( 'Select images', VCE_TEXT_DOMAIN ),
+				'removeLabel'      => __( 'Remove image', VCE_TEXT_DOMAIN ),
+				'dragHandleLabel'  => __( 'Drag to reorder', VCE_TEXT_DOMAIN ),
+				'panelsCountEmpty' => __( 'No panels yet.', VCE_TEXT_DOMAIN ),
+				'panelsCountOne'   => __( '1 panel', VCE_TEXT_DOMAIN ),
+				/* translators: %d: number of panels */
+				'panelsCountMany'  => __( '%d panels', VCE_TEXT_DOMAIN ),
+				/* translators: 1: current panel index, 2: total panels */
+				'panelOfMany'      => __( 'Panel %1$s of %2$s', VCE_TEXT_DOMAIN ),
+				'fullPreview'      => __( 'Full preview', VCE_TEXT_DOMAIN ),
+				'closeModal'       => __( 'Close', VCE_TEXT_DOMAIN ),
+				'modalAriaLabel'   => __( 'Panel preview', VCE_TEXT_DOMAIN ),
 			]
 		);
 	}

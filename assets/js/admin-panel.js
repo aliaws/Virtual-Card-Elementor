@@ -1,8 +1,10 @@
 /**
- * Virtual Card Elementor — admin panel picker (wp.media + list UI)
+ * Virtual Card Elementor — Card Panels: filmstrip, stage preview, sortable, modal.
  */
 (function ($) {
 	'use strict';
+
+	var frame;
 
 	function escapeAttr(str) {
 		return String(str)
@@ -11,9 +13,180 @@
 			.replace(/</g, '&lt;');
 	}
 
-	var frame;
+	function getI18n() {
+		return window.vceAdminPanel || {};
+	}
+
+	function formatPanelCount(n) {
+		var i18n = getI18n();
+		if (n === 0) {
+			return i18n.panelsCountEmpty || '';
+		}
+		if (n === 1) {
+			return i18n.panelsCountOne || '1 panel';
+		}
+		var tpl = i18n.panelsCountMany || '%d panels';
+		return tpl.replace('%d', String(n));
+	}
+
+	function formatPanelOf(index, total) {
+		var i18n = getI18n();
+		var tpl = i18n.panelOfMany || 'Panel %1$s of %2$s';
+		return tpl.replace('%1$s', String(index)).replace('%2$s', String(total));
+	}
+
+	function syncIdsFromList($wrap) {
+		var ids = [];
+		$wrap.find('.vce-panel-meta__list .vce-panel-meta__item').each(function () {
+			var id = $(this).data('id');
+			if (id) {
+				ids.push(String(id));
+			}
+		});
+		$wrap.find('.vce-panel-meta__ids').val(ids.join(','));
+	}
+
+	function updateCount($wrap) {
+		var n = $wrap.find('.vce-panel-meta__list .vce-panel-meta__item').length;
+		$wrap.find('[data-vce-panel-count]').text(formatPanelCount(n));
+	}
+
+	function getSelectedUrl($wrap) {
+		var $sel = $wrap.find('.vce-panel-meta__item.is-selected').first();
+		if (!$sel.length) {
+			return '';
+		}
+		return String($sel.data('preview-url') || '');
+	}
+
+	function updateStage($wrap) {
+		var $items = $wrap.find('.vce-panel-meta__list .vce-panel-meta__item');
+		var $empty = $wrap.find('[data-vce-panel-stage-empty]');
+		var $frame = $wrap.find('[data-vce-panel-stage-frame]');
+		var $img = $wrap.find('[data-vce-panel-stage-img]');
+		var $label = $wrap.find('[data-vce-panel-stage-label]');
+
+		if (!$items.length) {
+			$empty.removeAttr('hidden');
+			$frame.attr('hidden', 'hidden');
+			$label.attr('hidden', 'hidden').text('');
+			$img.attr('src', '');
+			return;
+		}
+
+		var $sel = $items.filter('.is-selected').first();
+		if (!$sel.length) {
+			$sel = $items.first();
+			$sel.addClass('is-selected');
+		}
+
+		var url = String($sel.data('preview-url') || '');
+		var idx = $items.index($sel) + 1;
+		var total = $items.length;
+
+		$empty.attr('hidden', 'hidden');
+		$frame.removeAttr('hidden');
+		$label.removeAttr('hidden').text(formatPanelOf(idx, total));
+
+		if (url) {
+			$img.removeAttr('hidden');
+			$img.attr('src', url);
+		} else {
+			$img.attr('src', '');
+		}
+	}
+
+	function initSortable($wrap) {
+		var $list = $wrap.find('.vce-panel-meta__list');
+		if (!$list.length || typeof $list.sortable !== 'function') {
+			return;
+		}
+		if ($list.data('vce-sortable-init')) {
+			$list.sortable('destroy');
+		}
+		$list.sortable({
+			items: '> .vce-panel-meta__item',
+			handle: '.vce-panel-meta__drag',
+			axis: 'x',
+			tolerance: 'pointer',
+			update: function () {
+				syncIdsFromList($wrap);
+				updateStage($wrap);
+			},
+		});
+		$list.data('vce-sortable-init', true);
+	}
+
+	function selectItem($wrap, $li) {
+		$wrap.find('.vce-panel-meta__item').removeClass('is-selected');
+		$li.addClass('is-selected');
+		updateStage($wrap);
+	}
+
+	function openModal($wrap) {
+		var url = getSelectedUrl($wrap);
+		if (!url) {
+			return;
+		}
+		var $modal = $wrap.find('[data-vce-panel-modal]');
+		var $mimg = $wrap.find('[data-vce-panel-modal-img]');
+		$mimg.attr('src', url);
+		$modal.removeAttr('hidden');
+		$wrap.find('.vce-panel-modal__close').first().trigger('focus');
+	}
+
+	function closeModal($wrap) {
+		$wrap.find('[data-vce-panel-modal]').attr('hidden', 'hidden');
+		$wrap.find('[data-vce-panel-modal-img]').attr('src', '');
+	}
+
+	function buildListItem(img, i18n) {
+		var thumb =
+			img.sizes && img.sizes.thumbnail && img.sizes.thumbnail.url
+				? img.sizes.thumbnail.url
+				: img.url || '';
+		var preview =
+			img.sizes && img.sizes.large && img.sizes.large.url
+				? img.sizes.large.url
+				: img.url || '';
+		var removeLabel = i18n.removeLabel || 'Remove image';
+		var dragLabel = i18n.dragHandleLabel || 'Drag to reorder';
+
+		return (
+			'<li class="vce-panel-meta__item" data-id="' +
+			img.id +
+			'" data-preview-url="' +
+			escapeAttr(preview) +
+			'">' +
+			'<button type="button" class="vce-panel-meta__drag" aria-label="' +
+			escapeAttr(dragLabel) +
+			'" title="' +
+			escapeAttr(dragLabel) +
+			'">⋮⋮</button>' +
+			'<span class="vce-panel-meta__thumb">' +
+			(thumb ? '<img src="' + escapeAttr(thumb) + '" alt="" />' : '') +
+			'</span>' +
+			'<a href="#" class="vce-panel-meta__remove remove" aria-label="' +
+			escapeAttr(removeLabel) +
+			'">×</a>' +
+			'</li>'
+		);
+	}
+
+	function initWrap($wrap) {
+		if (!$wrap.length) {
+			return;
+		}
+		updateCount($wrap);
+		updateStage($wrap);
+		initSortable($wrap);
+	}
 
 	function init() {
+		$('.vce-panel-meta').each(function () {
+			initWrap($(this));
+		});
+
 		$(document).on('click', '[data-vce-panel-add]', function (e) {
 			e.preventDefault();
 
@@ -29,7 +202,7 @@
 				return;
 			}
 
-			var i18n = window.vceAdminPanel || {};
+			var i18n = getI18n();
 
 			if (!frame) {
 				frame = wp.media({
@@ -50,33 +223,24 @@
 					}
 
 					var selection = frame.state().get('selection').toJSON();
-					var ids = $h.val() ? $h.val().split(',') : [];
+					var i18nInner = getI18n();
 
 					selection.forEach(function (img) {
 						if (!img || !img.id) {
 							return;
 						}
-						ids.push(String(img.id));
-
-						var thumb =
-							img.sizes && img.sizes.thumbnail && img.sizes.thumbnail.url
-								? img.sizes.thumbnail.url
-								: img.url || '';
-
-						var removeLabel = i18n.removeLabel || 'Remove image';
-						$l.append(
-							'<li class="vce-panel-meta__item" data-id="' +
-								img.id +
-								'">' +
-								(thumb ? '<img src="' + thumb + '" alt="" />' : '') +
-								'<a href="#" class="vce-panel-meta__remove remove" aria-label="' +
-								escapeAttr(removeLabel) +
-								'">×</a>' +
-								'</li>'
-						);
+						$l.append(buildListItem(img, i18nInner));
 					});
 
-					$h.val(ids.filter(Boolean).join(','));
+					syncIdsFromList($w);
+					updateCount($w);
+					var $last = $l.find('.vce-panel-meta__item').last();
+					if ($last.length) {
+						selectItem($w, $last);
+					} else {
+						updateStage($w);
+					}
+					initSortable($w);
 				});
 			}
 
@@ -84,11 +248,25 @@
 			frame.open();
 		});
 
+		$(document).on('click', '.vce-panel-meta__list', function (e) {
+			var $t = $(e.target);
+			if ($t.closest('.vce-panel-meta__remove').length || $t.closest('.vce-panel-meta__drag').length) {
+				return;
+			}
+			var $li = $t.closest('.vce-panel-meta__item');
+			if (!$li.length) {
+				return;
+			}
+			var $wrap = $li.closest('.vce-panel-meta');
+			selectItem($wrap, $li);
+		});
+
 		$(document).on('click', '.vce-panel-meta .remove', function (e) {
 			e.preventDefault();
 			var $wrap = $(this).closest('.vce-panel-meta');
 			var $hidden = $wrap.find('.vce-panel-meta__ids');
 			var $li = $(this).closest('li');
+			var wasSelected = $li.hasClass('is-selected');
 			var id = String($li.data('id'));
 			var ids = $hidden.val() ? $hidden.val().split(',') : [];
 
@@ -97,6 +275,43 @@
 			});
 			$hidden.val(ids.join(','));
 			$li.remove();
+
+			updateCount($wrap);
+			if (wasSelected) {
+				var $next = $wrap.find('.vce-panel-meta__item').first();
+				if ($next.length) {
+					selectItem($wrap, $next);
+				} else {
+					$wrap.find('.vce-panel-meta__item').removeClass('is-selected');
+					updateStage($wrap);
+				}
+			} else {
+				updateStage($wrap);
+			}
+			initSortable($wrap);
+		});
+
+		$(document).on('click', '[data-vce-panel-expand]', function (e) {
+			e.preventDefault();
+			var $wrap = $(this).closest('.vce-panel-meta');
+			openModal($wrap);
+		});
+
+		$(document).on('click', '[data-vce-panel-modal-close]', function (e) {
+			e.preventDefault();
+			var $wrap = $(this).closest('.vce-panel-meta');
+			closeModal($wrap);
+		});
+
+		$(document).on('keydown', function (e) {
+			if (e.key !== 'Escape') {
+				return;
+			}
+			$('.vce-panel-modal:not([hidden])').each(function () {
+				var $modal = $(this);
+				var $wrap = $modal.closest('.vce-panel-meta');
+				closeModal($wrap);
+			});
 		});
 	}
 
