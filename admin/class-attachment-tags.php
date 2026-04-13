@@ -83,14 +83,14 @@ class Attachment_Tags {
 			'vce-admin-attachment-tags',
 			VCE_PLUGIN_URL . 'assets/css/admin-attachment-tags.css',
 			[ 'vce-tagify' ],
-			VCE_VERSION
+			vce_asset_version( 'assets/css/admin-attachment-tags.css' )
 		);
 
 		wp_enqueue_script(
 			'vce-admin-attachment-tags',
 			VCE_PLUGIN_URL . 'assets/js/admin-attachment-tags.js',
 			[ 'jquery', 'vce-tagify', 'underscore', 'media-views' ],
-			VCE_VERSION,
+			vce_asset_version( 'assets/js/admin-attachment-tags.js' ),
 			true
 		);
 

@@ -106,7 +106,7 @@ class Card_Panels_Widget extends Widget_Base {
 				'label_off'    => __( 'No', VCE_TEXT_DOMAIN ),
 				'return_value' => 'yes',
 				'default'      => 'yes',
-				'description'  => __( 'Toolbar, filmstrip, and draggable text. Use Save submission (logged-in) to store a copy; the virtual card template is not modified.', VCE_TEXT_DOMAIN ),
+				'description'  => __( 'Toolbar, filmstrip, and draggable text. Drafts are stored in the visitor’s browser only; the virtual card template in the database is not modified.', VCE_TEXT_DOMAIN ),
 			]
 		);
 
@@ -288,36 +288,22 @@ class Card_Panels_Widget extends Widget_Base {
 
 			self::enqueue_editor_google_font( $font_key );
 
-			$can_save = is_user_logged_in()
-				&& function_exists( 'vce_can_persist_front_editor_design' )
-				&& vce_can_persist_front_editor_design();
-
 			$editor_localize = [
-					'defaultFont'           => $font_key,
-					'fontStacks'            => self::get_font_stacks_for_js(),
-					'restUrl'               => rest_url( 'vce/v1/submissions' ),
-					'nonce'                 => wp_create_nonce( 'wp_rest' ),
-					'canSaveSubmission'     => $can_save,
-					'submissionStorageKey'  => 'vce_submission_id_' . (int) $post->ID,
-					'i18n'                  => [
-						'defaultText'        => __( 'Your text', VCE_TEXT_DOMAIN ),
-						'finalReview'        => __( 'Final review', VCE_TEXT_DOMAIN ),
-						'closePreview'       => __( 'Close', VCE_TEXT_DOMAIN ),
-						'previewLoading'     => __( 'Building preview…', VCE_TEXT_DOMAIN ),
-						'prevPanel'          => __( 'Previous panel', VCE_TEXT_DOMAIN ),
-						'nextPanel'          => __( 'Next panel', VCE_TEXT_DOMAIN ),
-						'panelPreview'       => __( 'Panel preview', VCE_TEXT_DOMAIN ),
-						'saveSubmission'     => __( 'Save submission', VCE_TEXT_DOMAIN ),
-						'savingSubmission'   => __( 'Saving…', VCE_TEXT_DOMAIN ),
-						'submissionSaved'    => __( 'Saved.', VCE_TEXT_DOMAIN ),
-						'submissionError'    => __( 'Could not save. Try again.', VCE_TEXT_DOMAIN ),
-						'openPreview'        => __( 'Open preview link', VCE_TEXT_DOMAIN ),
-						'submissionLoginHint'=> __( 'Log in to save your design to the site.', VCE_TEXT_DOMAIN ),
-						'leaveUnsavedDesign' => __(
-							'Your card is not saved to the site yet. Save submission before leaving, or the preview link may not include your latest text.',
-							VCE_TEXT_DOMAIN
-						),
-					],
+				'defaultFont'  => $font_key,
+				'fontStacks'   => self::get_font_stacks_for_js(),
+				'i18n'         => [
+					'defaultText'         => __( 'Your text', VCE_TEXT_DOMAIN ),
+					'finalReview'         => __( 'Final review', VCE_TEXT_DOMAIN ),
+					'closePreview'        => __( 'Close', VCE_TEXT_DOMAIN ),
+					'previewLoading'      => __( 'Building preview…', VCE_TEXT_DOMAIN ),
+					'prevPanel'           => __( 'Previous panel', VCE_TEXT_DOMAIN ),
+					'nextPanel'           => __( 'Next panel', VCE_TEXT_DOMAIN ),
+					'panelPreview'        => __( 'Panel preview', VCE_TEXT_DOMAIN ),
+					'leaveUnsavedDraft'   => __(
+						'You have text on this card that is only saved in this browser. Leave anyway?',
+						VCE_TEXT_DOMAIN
+					),
+				],
 			];
 			if ( \Virtual_Card_Elementor\Debug_Log::vce_debug_client_enabled() ) {
 				$editor_localize['vceDiag'] = [
@@ -348,12 +334,11 @@ class Card_Panels_Widget extends Widget_Base {
 			Template::render(
 				'frontend/card-panels-editor.php',
 				[
-					'post_id'             => (int) $post->ID,
-					'ids'                 => $ids,
-					'panels_data'         => $panels_data,
-					'editor_font'         => $font_key,
-					'font_options'        => self::get_font_options_labels(),
-					'can_save_submission' => $can_save,
+					'post_id'      => (int) $post->ID,
+					'ids'          => $ids,
+					'panels_data'  => $panels_data,
+					'editor_font'  => $font_key,
+					'font_options' => self::get_font_options_labels(),
 				]
 			);
 			return;

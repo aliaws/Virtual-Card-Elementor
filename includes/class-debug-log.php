@@ -63,7 +63,7 @@ final class Debug_Log {
 			'vce-debug-client',
 			VCE_PLUGIN_URL . 'assets/js/vce-debug-client.js',
 			[],
-			VCE_VERSION,
+			vce_asset_version( 'assets/js/vce-debug-client.js' ),
 			true
 		);
 		wp_localize_script(

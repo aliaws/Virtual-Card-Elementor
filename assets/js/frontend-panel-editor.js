@@ -97,25 +97,6 @@
 		});
 	}
 
-	function pushVceDebugLine(msg) {
-		var c = typeof vceDebugClient !== 'undefined' ? vceDebugClient : null;
-		if (!c || !c.enabled || !c.restUrl || !c.nonce) {
-			return;
-		}
-		try {
-			fetch(c.restUrl, {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-WP-Nonce': c.nonce,
-				},
-				body: JSON.stringify({ lines: [String(msg).slice(0, 2000)] }),
-				keepalive: true,
-			}).catch(function () {});
-		} catch (e) {}
-	}
-
 	function init(root) {
 		if (typeof fabric === 'undefined') {
 			return;
@@ -161,8 +142,6 @@
 		var modalMain = root.querySelector('[data-vce-preview-main]');
 		var btnPrev = root.querySelector('[data-vce-preview-prev]');
 		var btnNext = root.querySelector('[data-vce-preview-next]');
-		var btnSave = root.querySelector('[data-vce-save-submission]');
-		var saveStatus = root.querySelector('[data-vce-save-status]');
 
 		if (!canvasEl || !wrapEl) {
 			return;
@@ -187,8 +166,8 @@
 
 		var activeIndex = 0;
 		var layersByPanel = {};
-		/** True while canvas/draft has content not yet written by a successful "Save submission". */
-		var submissionDirty = false;
+		/** True while local draft has text layers (browser-only; warn on leave). */
+		var draftDirty = false;
 		var loadingPanel = false;
 		var previewUrls = [];
 		var previewIndex = 0;
@@ -294,23 +273,8 @@
 			return false;
 		}
 
-		function updateSubmissionDirtyFlag() {
-			submissionDirty = hasAnyLayerContent();
-		}
-
-		/**
-		 * After a successful server save: clear local draft and canvas so the virtual card shows as template only.
-		 * Submission post (recipient link) already holds the saved design; the card post in the database is never modified.
-		 */
-		function resetEditorAfterSubmissionSave() {
-			try {
-				localStorage.removeItem(storageKey);
-			} catch (e) {
-				/* ignore */
-			}
-			layersByPanel = {};
-			submissionDirty = false;
-			loadPanel(activeIndex, true);
+		function updateDraftDirtyFlag() {
+			draftDirty = hasAnyLayerContent();
 		}
 
 		function getPanelState(index) {
@@ -332,7 +296,7 @@
 			fixCanvasTextBaselineInPayloads(objs);
 			layersByPanel[String(activeIndex)] = { objects: objs };
 			saveDraft();
-			updateSubmissionDirtyFlag();
+			updateDraftDirtyFlag();
 		}
 
 		function applyPanelContents(targetCanvas, index, maxW, maxH, onDone) {
@@ -343,8 +307,8 @@
 			}
 			var objects = getPanelState(index);
 
-			fabric.Image.fromURL(url, function (bg) {
-				if (!bg || !bg.width) {
+			fabric.Image.fromURL(url, function (bg, isError) {
+				if (isError || !bg || !bg.width) {
 					onDone(false);
 					return;
 				}
@@ -624,7 +588,7 @@
 				updateThumbs();
 				loadingPanel = false;
 				syncToolbarFromSelection();
-				updateSubmissionDirtyFlag();
+				updateDraftDirtyFlag();
 			});
 		}
 
@@ -819,93 +783,6 @@
 			previewUrls = [];
 		}
 
-		function saveSubmissionToServer() {
-			if (!cfg.restUrl || !cfg.nonce || !cfg.canSaveSubmission) {
-				return;
-			}
-			saveCurrentPanelObjects();
-			var body = {
-				card_id: parseInt(postId, 10) || 0,
-				layers: { v: STORAGE_VERSION, panels: layersByPanel },
-			};
-			var sk = cfg.submissionStorageKey;
-			if (sk) {
-				var sid = localStorage.getItem(sk);
-				if (sid && /^\d+$/.test(sid)) {
-					body.submission_id = parseInt(sid, 10);
-				}
-			}
-			if (btnSave) {
-				btnSave.disabled = true;
-			}
-			if (saveStatus) {
-				saveStatus.textContent = i18n.savingSubmission || 'Saving…';
-			}
-			fetch(cfg.restUrl, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-WP-Nonce': cfg.nonce,
-				},
-				body: JSON.stringify(body),
-			})
-				.then(function (r) {
-					return r.json().then(function (data) {
-						return { ok: r.ok, data: data };
-					});
-				})
-				.then(function (res) {
-					if (res.ok && res.data && res.data.submission_id) {
-						if (sk) {
-							localStorage.setItem(sk, String(res.data.submission_id));
-						}
-						resetEditorAfterSubmissionSave();
-						if (saveStatus) {
-							saveStatus.textContent = '';
-							saveStatus.appendChild(
-								document.createTextNode((i18n.submissionSaved || 'Saved.') + ' ')
-							);
-							var url = res.data.preview_url || '';
-							if (url) {
-								var a = document.createElement('a');
-								a.href = url;
-								a.target = '_blank';
-								a.rel = 'noopener noreferrer';
-								a.textContent = i18n.openPreview || 'Open preview';
-								saveStatus.appendChild(a);
-							}
-						}
-					} else {
-						var msg =
-							(res.data && res.data.message) ||
-							i18n.submissionError ||
-							'Error';
-						pushVceDebugLine(
-							'[saveSubmission] fail http_ok=' +
-								res.ok +
-								' code=' +
-								(res.data && res.data.code ? res.data.code : '') +
-								' msg=' +
-								msg
-						);
-						if (saveStatus) {
-							saveStatus.textContent = msg;
-						}
-					}
-				})
-				.catch(function (err) {
-					pushVceDebugLine('[saveSubmission] fetch_error ' + (err && err.message ? err.message : String(err)));
-					if (saveStatus) {
-						saveStatus.textContent = i18n.submissionError || 'Error';
-					}
-				})
-				.finally(function () {
-					if (btnSave && cfg.canSaveSubmission) {
-						btnSave.disabled = false;
-					}
-				});
-		}
-
 		fabricCanvas.on('selection:created', syncToolbarFromSelection);
 		fabricCanvas.on('selection:updated', syncToolbarFromSelection);
 		fabricCanvas.on('selection:cleared', syncToolbarFromSelection);
@@ -919,9 +796,6 @@
 		}
 		if (btnReview) {
 			btnReview.addEventListener('click', openPreviewModal);
-		}
-		if (btnSave && cfg.canSaveSubmission) {
-			btnSave.addEventListener('click', saveSubmissionToServer);
 		}
 		if (btnDel) {
 			btnDel.addEventListener('click', deleteSelected);
@@ -1030,15 +904,15 @@
 		}
 
 		loadDraft();
-		updateSubmissionDirtyFlag();
+		updateDraftDirtyFlag();
 		loadPanel(0, true);
 
 		window.addEventListener('beforeunload', function (e) {
 			saveCurrentPanelObjects();
-			if (!submissionDirty) {
+			if (!draftDirty) {
 				return;
 			}
-			var msg = i18n.leaveUnsavedDesign || '';
+			var msg = i18n.leaveUnsavedDraft || '';
 			if (!msg) {
 				return;
 			}

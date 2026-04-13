@@ -73,14 +73,14 @@ class Panel_Meta_Box {
 			'vce-admin-panel',
 			VCE_PLUGIN_URL . 'assets/css/admin-panel.css',
 			[],
-			VCE_VERSION
+			vce_asset_version( 'assets/css/admin-panel.css' )
 		);
 
 		wp_enqueue_script(
 			'vce-admin-panel',
 			VCE_PLUGIN_URL . 'assets/js/admin-panel.js',
 			[ 'jquery', 'jquery-ui-sortable', 'media-editor' ],
-			VCE_VERSION,
+			vce_asset_version( 'assets/js/admin-panel.js' ),
 			true
 		);
 

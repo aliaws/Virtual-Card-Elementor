@@ -9,12 +9,9 @@
  * @var array                $panels_data Serialized panel payloads for JS.
  * @var string               $editor_font Selected font key.
  * @var array<string,string> $font_options Font key => label for toolbar select.
- * @var bool                 $can_save_submission Whether server save (REST) is available.
  */
 
 defined( 'ABSPATH' ) || exit;
-
-$can_save_submission = ! empty( $can_save_submission );
 
 $json = wp_json_encode(
 	$panels_data,
@@ -41,16 +38,6 @@ if ( false === $json ) {
 				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--ghost" data-vce-add-text>
 					<?php esc_html_e( 'Add text', VCE_TEXT_DOMAIN ); ?>
 				</button>
-				<button
-					type="button"
-					class="button vce-panel-editor__btn vce-panel-editor__btn--ghost"
-					data-vce-save-submission
-					<?php echo $can_save_submission ? '' : ' disabled'; ?>
-					title="<?php echo $can_save_submission ? '' : esc_attr__( 'Log in to save your design to the site.', VCE_TEXT_DOMAIN ); ?>"
-				>
-					<?php esc_html_e( 'Save submission', VCE_TEXT_DOMAIN ); ?>
-				</button>
-				<span class="vce-panel-editor__save-status" data-vce-save-status aria-live="polite"></span>
 			</div>
 				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--danger" data-vce-delete-layer disabled>
 					<?php esc_html_e( 'Remove text', VCE_TEXT_DOMAIN ); ?>
@@ -196,7 +183,7 @@ if ( false === $json ) {
 			class="vce-preview-modal__dialog"
 			role="dialog"
 			aria-modal="true"
-			aria-label="<?php echo esc_attr__( 'Submission preview', VCE_TEXT_DOMAIN ); ?>"
+			aria-label="<?php echo esc_attr__( 'Panel preview', VCE_TEXT_DOMAIN ); ?>"
 		>
 			<div class="vce-preview-modal__header vce-preview-modal__header--minimal">
 				<span class="vce-preview-modal__title vce-preview-modal__title--sr-only" data-vce-preview-title></span>

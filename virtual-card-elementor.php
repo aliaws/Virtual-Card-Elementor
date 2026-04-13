@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Virtual Card Elementor
  * Description: Registers the Virtual Card custom post type, admin Card Panels (images per card), and an Elementor widget that outputs those panels for the current post in the loop.
- * Version: 1.4.0
+ * Version: 1.5.0
  * Author: Accurate Digital Solutions
  * Text Domain: virtual-card-elementor
  * Requires at least: 5.8
@@ -22,6 +22,25 @@ define( 'VCE_PLUGIN_FILE', __FILE__ );
 define( 'VCE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'VCE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'VCE_TEXT_DOMAIN', 'virtual-card-elementor' );
+
+if ( ! function_exists( 'vce_asset_version' ) ) {
+	/**
+	 * Cache-busting version for enqueued CSS/JS: release version + file mtime.
+	 *
+	 * @param string $relative_path Path under the plugin directory, e.g. assets/js/frontend-panel-editor.js
+	 */
+	function vce_asset_version( string $relative_path ): string {
+		$relative_path = str_replace( '\\', '/', ltrim( $relative_path, '/' ) );
+		$path          = VCE_PLUGIN_DIR . $relative_path;
+		if ( is_readable( $path ) ) {
+			$mtime = filemtime( $path );
+			if ( false !== $mtime ) {
+				return VCE_VERSION . '.' . $mtime;
+			}
+		}
+		return VCE_VERSION;
+	}
+}
 
 if ( ! defined( 'VCE_DEBUG' ) ) {
 	define( 'VCE_DEBUG', false );
@@ -47,19 +66,10 @@ if ( ! function_exists( 'vce_get_front_editor_mode' ) ) {
 
 if ( ! function_exists( 'vce_can_use_front_editor' ) ) {
 	/**
-	 * Whether the current visitor may use the future front-end editor UI.
+	 * Whether the current visitor may use the front-end editor UI.
 	 */
 	function vce_can_use_front_editor(): bool {
 		return Virtual_Card_Elementor\Editor_Access::can_use_front_editor();
-	}
-}
-
-if ( ! function_exists( 'vce_can_persist_front_editor_design' ) ) {
-	/**
-	 * Whether the current visitor may save design data via REST (when implemented).
-	 */
-	function vce_can_persist_front_editor_design(): bool {
-		return Virtual_Card_Elementor\Editor_Access::can_persist_design();
 	}
 }
 
