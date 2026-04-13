@@ -38,7 +38,6 @@ class Virtual_Card_Admin_Columns {
 		foreach ( $columns as $key => $label ) {
 			$new[ $key ] = $label;
 			if ( 'title' === $key ) {
-				$new['vce_card_no'] = __( 'No. of cards', VCE_TEXT_DOMAIN );
 				$new['vce_panels']  = __( 'No. of panels', VCE_TEXT_DOMAIN );
 			}
 		}
@@ -52,11 +51,6 @@ class Virtual_Card_Admin_Columns {
 	 * @param int    $post_id     Post ID.
 	 */
 	public function render_column( string $column_name, int $post_id ): void {
-		if ( 'vce_card_no' === $column_name ) {
-			// Each row is one Virtual Card post, so the count of cards represented is always 1.
-			echo '1';
-			return;
-		}
 
 		if ( 'vce_panels' !== $column_name ) {
 			return;
