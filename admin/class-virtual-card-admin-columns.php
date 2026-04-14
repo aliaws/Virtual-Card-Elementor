@@ -63,4 +63,5 @@ class Virtual_Card_Admin_Columns {
 		$ids = array_filter( array_map( 'intval', $ids ) );
 		echo esc_html( (string) count( $ids ) );
 	}
+
 }

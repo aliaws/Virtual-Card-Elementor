@@ -5,8 +5,10 @@
  * @package Virtual_Card_Elementor
  *
  * @var int                  $post_id
+ * @var int                  $source_card_id
  * @var int[]                $ids
  * @var array                $panels_data Serialized panel payloads for JS.
+ * @var array                $saved_layers Stored submission layer payloads.
  * @var string               $editor_font Selected font key.
  * @var array<string,string> $font_options Font key => label for toolbar select.
  */
@@ -20,12 +22,22 @@ $json = wp_json_encode(
 if ( false === $json ) {
 	$json = '[]';
 }
+
+$saved_json = wp_json_encode(
+	$saved_layers ?? [],
+	JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+);
+if ( false === $saved_json ) {
+	$saved_json = '{}';
+}
 ?>
 <div
 	class="vce-panel-editor"
 	data-vce-panel-editor
 	data-post-id="<?php echo esc_attr( (string) $post_id ); ?>"
+	data-source-card-id="<?php echo esc_attr( (string) $source_card_id ); ?>"
 	data-panels="<?php echo esc_attr( $json ); ?>"
+	data-saved-layers="<?php echo esc_attr( $saved_json ); ?>"
 	data-default-font="<?php echo esc_attr( $editor_font ); ?>"
 >
 	<div class="vce-panel-editor__toolbar" role="toolbar" aria-label="<?php echo esc_attr__( 'Card editor tools', VCE_TEXT_DOMAIN ); ?>">
@@ -35,10 +47,13 @@ if ( false === $json ) {
 					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
 						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
 					</button>
-				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--ghost" data-vce-add-text>
-					<?php esc_html_e( 'Add text', VCE_TEXT_DOMAIN ); ?>
-				</button>
-			</div>
+					<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--ghost" data-vce-add-text>
+						<?php esc_html_e( 'Add text', VCE_TEXT_DOMAIN ); ?>
+					</button>
+					<button type="button" class="button button-secondary vce-panel-editor__btn" data-vce-save-submission>
+						<?php esc_html_e( 'Save submission', VCE_TEXT_DOMAIN ); ?>
+					</button>
+				</div>
 				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--danger" data-vce-delete-layer disabled>
 					<?php esc_html_e( 'Remove text', VCE_TEXT_DOMAIN ); ?>
 				</button>
@@ -142,6 +157,7 @@ if ( false === $json ) {
 		<div class="vce-panel-editor__toolbar-meta">
 			<span class="vce-panel-editor__panel-label" data-vce-panel-label></span>
 			<span class="vce-panel-editor__draft-note"><?php esc_html_e( 'Draft saved in this browser only.', VCE_TEXT_DOMAIN ); ?></span>
+			<a class="vce-panel-editor__submission-link" data-vce-submission-link hidden></a>
 		</div>
 	</div>
 
@@ -203,7 +219,10 @@ if ( false === $json ) {
 				<div class="vce-preview-modal__body" data-vce-preview-body hidden>
 					<button type="button" class="vce-preview-modal__nav vce-preview-modal__nav--prev" data-vce-preview-prev aria-label="<?php echo esc_attr__( 'Previous panel', VCE_TEXT_DOMAIN ); ?>">‹</button>
 					<div class="vce-preview-modal__stage">
-						<img src="" alt="" class="vce-preview-modal__main" data-vce-preview-main decoding="async" />
+						<div class="vce-preview-modal__frame" data-vce-preview-frame>
+							<img src="" alt="" class="vce-preview-modal__main" data-vce-preview-main decoding="async" />
+							<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" class="vce-preview-modal__overlay" data-vce-preview-overlay decoding="async" hidden />
+						</div>
 					</div>
 					<button type="button" class="vce-preview-modal__nav vce-preview-modal__nav--next" data-vce-preview-next aria-label="<?php echo esc_attr__( 'Next panel', VCE_TEXT_DOMAIN ); ?>">›</button>
 				</div>

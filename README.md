@@ -1,8 +1,8 @@
 # Virtual Card Elementor
 
-Minimal WordPress plugin that registers the **`virtual_card`** post type, stores **Card Panels** (attachment IDs) in post meta, and registers an **Elementor** widget named **Card Panels** that outputs those images for whatever post is current in the loop.
+WordPress plugin that registers a **`virtual_card`** post type, stores **Card Panels** (attachment IDs) in post meta, and provides an **Elementor** widget (**Card Panels**) with a front-end editor and submission flow.
 
-There is **no** custom taxonomy in this version—only the post type, panel meta, and the widget.
+It also registers a child post type **`card_submission`** (under the Virtual Cards menu) so front-end edits can be saved to a separate submission and previewed without modifying the original virtual card.
 
 ## Requirements
 
@@ -37,6 +37,18 @@ If you used an earlier copy of this plugin that stored images under **`_virtual_
 | `supports` | `title`, `editor`, `thumbnail` |
 | `show_in_rest` | `true` |
 
+**Custom post type `card_submission` (`Post_Type` on `init`)**
+
+| Argument | Value |
+|----------|--------|
+| `public` | `false` |
+| `publicly_queryable` | `true` |
+| `show_ui` | `true` |
+| `show_in_menu` | `edit.php?post_type=virtual_card` (submenu under Virtual Cards) |
+| `hierarchical` | `false` (flat permalinks like `/card-submission/slug/`; parent is still stored in `post_parent`) |
+| `rewrite` | `slug` = `card-submission` |
+| `query_var` | `card_submission` |
+
 **Admin: Card Panels meta box (`Panel_Meta_Box`)**
 
 - Hook: `add_meta_boxes`
@@ -59,6 +71,14 @@ On **Virtual Cards → All Virtual Cards**, two columns are inserted after **Tit
 | **No. of cards** | Always **`1`** for each row (one Virtual Card post = one card). |
 | **No. of panels** | Count of attachment IDs stored in **`_virtual_card_panels`** for that post. |
 
+**Card Submissions admin (`Card_Submission_Admin`)**
+
+- Adds **Virtual card** column in submissions list.
+- Adds **Final view** column with a stable link to the submission’s front-end view (`/?post_type=card_submission&p=ID`).
+- Adds parent filter dropdown above the submissions list.
+- Adds a parent selector meta box on submission edit screen.
+- Saves `post_parent` safely (only allows parent posts of type `virtual_card`).
+
 **Elementor**
 
 - Hook: `elementor/widgets/register` registers **`Card_Panels_Widget`** from `elementor/class-card-panels-widget.php`.
@@ -73,6 +93,25 @@ On **Virtual Cards → All Virtual Cards**, two columns are inserted after **Tit
 | **Layout** | Columns (1–6), Limit |
 | **Style** | Gap / border radius on `.virtual-card-panels` |
 | **`render()`** | Uses **`global $post`**, reads **`_virtual_card_panels`**, outputs the panel grid for the current loop post |
+
+When the current post is a `card_submission`, widget rendering falls back to the parent virtual card panel IDs if needed, then applies submission layer data from **`_vce_submission_layers`**.
+
+**Front-end editor and submissions**
+
+- Editor UI is rendered by `templates/frontend/card-panels-editor.php` and powered by `assets/js/frontend-panel-editor.js`.
+- Users can click **Save submission** in the front-end editor.
+- Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`).
+- Endpoint creates a new `card_submission`, sets **`post_parent`** to the source virtual card, stores the layer payload in **`_vce_submission_layers`**, and returns **`url`** / **`preview_url`** (query-string style `/?post_type=card_submission&p=ID` so the link works even if permalinks need a flush).
+- **`_vce_submission_layers`** is a map keyed by panel index (`"0"`, `"1"`, …). Each value holds Fabric `objects` plus **`baseW`** / **`baseH`** (canvas size when saved) so text positions scale when the preview size changes.
+- Editor opens the returned preview link after save.
+- Parent virtual card panel attachments and **`_virtual_card_panels`** are not modified by submissions.
+
+**Final review (editor) and submission view (browser)**
+
+- **Final review** (editor) and **submission** pages use a full-page modal with the same layout CSS (`assets/css/frontend-panel-editor.css`).
+- Preview uses a **layered** approach: the bottom **`<img>`** uses the **real panel image URL** from WordPress; a transparent **overlay `<img>`** carries only the rendered text/shapes (PNG data URL from Fabric). That keeps the base asset URL visible in devtools while still showing edits on top.
+- Shared sizing and overlay rendering live in **`assets/js/frontend-panel-renderer.js`** (`buildPreviewSlides`). Submission-only UI is **`assets/js/frontend-panel-submission.js`** + **`templates/frontend/card-panels-submission.php`**.
+- On single **`card_submission`** posts, **`Plugin::append_submission_final_view`** (`the_content`) can inject the submission viewer when the Elementor widget is not present on the template.
 
 Use the widget where the main queried post is the desired `virtual_card` (e.g. single template for that CPT).
 
@@ -91,16 +130,24 @@ Use the widget where the main queried post is the desired `virtual_card` (e.g. s
 | `includes/class-plugin.php` | Hooks orchestration |
 | `includes/class-post-type.php` | CPT registration |
 | `includes/class-panel-meta.php` | Meta key constant |
+| `includes/class-card-submission-rest.php` | REST endpoint for saving front-end submissions |
 | `includes/class-template.php` | Template loader |
 | `admin/class-panel-meta-box.php` | Admin meta box + save + asset enqueue |
 | `admin/class-virtual-card-admin-columns.php` | Virtual Cards list table columns |
+| `admin/class-card-submission-admin.php` | Card submissions list UI + parent selector/save |
 | `admin/class-attachment-tags.php` | Attachment Tags field + AJAX + Tagify enqueue |
 | `elementor/class-card-panels-widget.php` | Elementor widget |
 | `templates/admin/panel-meta-box.php` | Admin markup |
 | `templates/frontend/card-panels.php` | Frontend markup |
+| `templates/frontend/card-panels-editor.php` | Front-end editor shell |
+| `templates/frontend/card-panels-submission.php` | Submission final-view modal (carousel) |
 | `assets/css/admin-panel.css` | Admin styles |
 | `assets/css/frontend-panel.css` | Widget styles |
+| `assets/css/frontend-panel-editor.css` | Front-end editor + preview/submission modal styles |
 | `assets/js/admin-panel.js` | Admin media picker UI |
+| `assets/js/frontend-panel-editor.js` | Front-end editor logic + final review + submission save/open |
+| `assets/js/frontend-panel-renderer.js` | Shared Fabric preview/slide builder (`buildPreviewSlides`, `buildPreviewUrls`) |
+| `assets/js/frontend-panel-submission.js` | Submission page carousel viewer |
 | `assets/js/admin-attachment-tags.js` | Tagify + media modal attachment details |
 | `assets/css/admin-attachment-tags.css` | Tagify layout in media sidebar |
 

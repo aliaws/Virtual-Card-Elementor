@@ -266,8 +266,26 @@ class Card_Panels_Widget extends Widget_Base {
 			return;
 		}
 
-		$settings = $this->get_settings_for_display();
-		$ids      = get_post_meta( $post->ID, Panel_Meta::META_KEY, true );
+		$settings     = $this->get_settings_for_display();
+		$source       = (int) $post->ID;
+		$ids          = get_post_meta( $source, Panel_Meta::META_KEY, true );
+		$saved_layers = [];
+
+		// Submissions can inherit panels from their parent virtual card without mutating the original card.
+		if ( \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type ) {
+			$maybe_saved = get_post_meta( $post->ID, Panel_Meta::SUBMISSION_LAYERS_META_KEY, true );
+			if ( is_array( $maybe_saved ) ) {
+				$saved_layers = $maybe_saved;
+			}
+		}
+
+		if ( ( empty( $ids ) || ! is_array( $ids ) ) && \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type ) {
+			$parent_id = (int) wp_get_post_parent_id( $post->ID );
+			if ( $parent_id > 0 && \Virtual_Card_Elementor\Post_Type::POST_TYPE === get_post_type( $parent_id ) ) {
+				$source = $parent_id;
+				$ids    = get_post_meta( $source, Panel_Meta::META_KEY, true );
+			}
+		}
 
 		if ( empty( $ids ) || ! is_array( $ids ) ) {
 			return;
@@ -276,8 +294,26 @@ class Card_Panels_Widget extends Widget_Base {
 		$limit   = ! empty( $settings['limit'] ) ? (int) $settings['limit'] : 6;
 		$ids     = array_slice( $ids, 0, $limit );
 		$columns = ! empty( $settings['columns'] ) ? (int) $settings['columns'] : 3;
+		$panels_data = [];
+		foreach ( $ids as $aid ) {
+			$aid   = (int) $aid;
+			$large = $aid ? wp_get_attachment_image_src( $aid, 'large' ) : null;
+			$thumb = $aid ? wp_get_attachment_image_src( $aid, 'thumbnail' ) : null;
+			$url   = ( $large && ! empty( $large[0] ) ) ? $large[0] : '';
+			if ( '' === $url && $aid ) {
+				$url = wp_get_attachment_url( $aid ) ?: '';
+			}
+			$panels_data[] = [
+				'id'    => $aid,
+				'url'   => $url,
+				'w'     => isset( $large[1] ) ? (int) $large[1] : 0,
+				'h'     => isset( $large[2] ) ? (int) $large[2] : 0,
+				'thumb' => ( $thumb && ! empty( $thumb[0] ) ) ? $thumb[0] : $url,
+			];
+		}
 
-		$editor_on = ! empty( $settings['enable_front_editor'] ) && 'yes' === $settings['enable_front_editor'];
+		$is_submission = \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type;
+		$editor_on     = ! $is_submission && ! empty( $settings['enable_front_editor'] ) && 'yes' === $settings['enable_front_editor'];
 		$can_edit  = function_exists( 'vce_can_use_front_editor' ) && vce_can_use_front_editor();
 
 		if ( $editor_on && $can_edit ) {
@@ -291,9 +327,17 @@ class Card_Panels_Widget extends Widget_Base {
 			$editor_localize = [
 				'defaultFont'  => $font_key,
 				'fontStacks'   => self::get_font_stacks_for_js(),
+				'submissionApi' => [
+					'endpoint' => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
+					'nonce'    => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
+				],
 				'i18n'         => [
 					'defaultText'         => __( 'Your text', VCE_TEXT_DOMAIN ),
 					'finalReview'         => __( 'Final review', VCE_TEXT_DOMAIN ),
+					'saveSubmission'      => __( 'Save submission', VCE_TEXT_DOMAIN ),
+					'savingSubmission'    => __( 'Saving…', VCE_TEXT_DOMAIN ),
+					'submissionSaved'     => __( 'Submission saved. Opening preview…', VCE_TEXT_DOMAIN ),
+					'submissionFailed'    => __( 'Could not save submission.', VCE_TEXT_DOMAIN ),
 					'closePreview'        => __( 'Close', VCE_TEXT_DOMAIN ),
 					'previewLoading'      => __( 'Building preview…', VCE_TEXT_DOMAIN ),
 					'prevPanel'           => __( 'Previous panel', VCE_TEXT_DOMAIN ),
@@ -313,32 +357,32 @@ class Card_Panels_Widget extends Widget_Base {
 			}
 			wp_localize_script( 'vce-frontend-panel-editor', 'vcePanelEditor', $editor_localize );
 
-			$panels_data = [];
-			foreach ( $ids as $aid ) {
-				$aid   = (int) $aid;
-				$large = $aid ? wp_get_attachment_image_src( $aid, 'large' ) : null;
-				$thumb = $aid ? wp_get_attachment_image_src( $aid, 'thumbnail' ) : null;
-				$url   = ( $large && ! empty( $large[0] ) ) ? $large[0] : '';
-				if ( '' === $url && $aid ) {
-					$url = wp_get_attachment_url( $aid ) ?: '';
-				}
-				$panels_data[] = [
-					'id'    => $aid,
-					'url'   => $url,
-					'w'     => isset( $large[1] ) ? (int) $large[1] : 0,
-					'h'     => isset( $large[2] ) ? (int) $large[2] : 0,
-					'thumb' => ( $thumb && ! empty( $thumb[0] ) ) ? $thumb[0] : $url,
-				];
-			}
-
 			Template::render(
 				'frontend/card-panels-editor.php',
 				[
-					'post_id'      => (int) $post->ID,
-					'ids'          => $ids,
+					'post_id'        => (int) $post->ID,
+					'source_card_id' => $source,
+					'ids'            => $ids,
+					'panels_data'    => $panels_data,
+					'saved_layers'   => $saved_layers,
+					'editor_font'    => $font_key,
+					'font_options'   => self::get_font_options_labels(),
+				]
+			);
+			return;
+		}
+
+		$columns = max( 1, min( 6, $columns ) );
+
+		if ( $is_submission ) {
+			wp_enqueue_script( 'fabric' );
+			wp_enqueue_script( 'vce-frontend-panel-submission' );
+			Template::render(
+				'frontend/card-panels-submission.php',
+				[
+					'columns'      => $columns,
 					'panels_data'  => $panels_data,
-					'editor_font'  => $font_key,
-					'font_options' => self::get_font_options_labels(),
+					'saved_layers' => $saved_layers,
 				]
 			);
 			return;
@@ -348,7 +392,7 @@ class Card_Panels_Widget extends Widget_Base {
 			'frontend/card-panels.php',
 			[
 				'ids'     => $ids,
-				'columns' => max( 1, min( 6, $columns ) ),
+				'columns' => $columns,
 			]
 		);
 	}

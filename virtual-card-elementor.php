@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Virtual Card Elementor
  * Description: Registers the Virtual Card custom post type, admin Card Panels (images per card), and an Elementor widget that outputs those panels for the current post in the loop.
- * Version: 1.5.0
+ * Version: 1.5.8
  * Author: Accurate Digital Solutions
  * Text Domain: virtual-card-elementor
  * Requires at least: 5.8

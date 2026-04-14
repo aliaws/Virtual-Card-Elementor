@@ -19,6 +19,16 @@
 		}
 	}
 
+	function parseSavedLayers(root) {
+		try {
+			var raw = root.getAttribute('data-saved-layers') || '{}';
+			var data = JSON.parse(raw);
+			return data && typeof data === 'object' ? data : {};
+		} catch (e) {
+			return {};
+		}
+	}
+
 	function clamp(n, min, max) {
 		return Math.max(min, Math.min(max, n));
 	}
@@ -77,6 +87,25 @@
 		return s === 'italic' || s === 'oblique';
 	}
 
+	function isUsableImageUrl(url) {
+		if (!url || typeof url !== 'string') {
+			return false;
+		}
+		var trimmed = url.trim();
+		return /^https?:\/\//i.test(trimmed) || /^data:image\//i.test(trimmed) || trimmed.charAt(0) === '/';
+	}
+
+	function isUsableOverlayUrl(url) {
+		if (!url || typeof url !== 'string') {
+			return false;
+		}
+		var trimmed = url.trim();
+		return /^data:image\//i.test(trimmed) && trimmed.length > 32;
+	}
+
+	var TRANSPARENT_PIXEL =
+		'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
 	/**
 	 * Canvas 2D textBaseline is "alphabetic", not "alphabetical". Invalid values trigger Chromium warnings in Fabric._setTextStyles.
 	 */
@@ -108,9 +137,9 @@
 		}
 
 		var postId = root.getAttribute('data-post-id') || '0';
-		var storageKey = STORAGE_PREFIX + postId;
 		var cfg = typeof vcePanelEditor !== 'undefined' ? vcePanelEditor : {};
 		var i18n = cfg.i18n || {};
+		var submissionApi = cfg.submissionApi || {};
 
 		if (cfg.vceDiag && typeof console !== 'undefined' && console.info) {
 			console.info('[VCE panel editor]', cfg.vceDiag);
@@ -125,6 +154,8 @@
 		var btnAdd = root.querySelector('[data-vce-add-text]');
 		var btnReview = root.querySelector('[data-vce-final-review]');
 		var btnDel = root.querySelector('[data-vce-delete-layer]');
+		var btnSaveSubmission = root.querySelector('[data-vce-save-submission]');
+		var submissionLink = root.querySelector('[data-vce-submission-link]');
 		var inputSize = root.querySelector('[data-vce-font-size]');
 		var inputColor = root.querySelector('[data-vce-text-color]');
 		var selectFont = root.querySelector('[data-vce-font-family]');
@@ -139,12 +170,25 @@
 		var modalLoading = root.querySelector('[data-vce-preview-loading]');
 		var modalBody = root.querySelector('[data-vce-preview-body]');
 		var modalTitle = root.querySelector('[data-vce-preview-title]');
+		var modalFrame = root.querySelector('[data-vce-preview-frame]');
 		var modalMain = root.querySelector('[data-vce-preview-main]');
+		var modalOverlay = root.querySelector('[data-vce-preview-overlay]');
 		var btnPrev = root.querySelector('[data-vce-preview-prev]');
 		var btnNext = root.querySelector('[data-vce-preview-next]');
 
 		if (!canvasEl || !wrapEl) {
 			return;
+		}
+		if (modalMain) {
+			modalMain.addEventListener('error', function () {
+				modalMain.removeAttribute('src');
+			});
+		}
+		if (modalOverlay) {
+			modalOverlay.addEventListener('error', function () {
+				modalOverlay.src = TRANSPARENT_PIXEL;
+				modalOverlay.setAttribute('hidden', 'hidden');
+			});
 		}
 
 		if (selectFont && defaultFontKey) {
@@ -165,11 +209,11 @@
 		});
 
 		var activeIndex = 0;
-		var layersByPanel = {};
+		var layersByPanel = parseSavedLayers(root);
 		/** True while local draft has text layers (browser-only; warn on leave). */
 		var draftDirty = false;
 		var loadingPanel = false;
-		var previewUrls = [];
+		var previewSlides = [];
 		var previewIndex = 0;
 		var previewScrollLocked = false;
 		var savedBodyOverflow = '';
@@ -226,38 +270,9 @@
 			previewScrollLocked = false;
 		}
 
-		function loadDraft() {
-			try {
-				var raw = localStorage.getItem(storageKey);
-				if (!raw) {
-					return;
-				}
-				var data = JSON.parse(raw);
-				if (!data || typeof data.panels !== 'object') {
-					return;
-				}
-				if (data.v !== STORAGE_VERSION) {
-					return;
-				}
-				layersByPanel = data.panels;
-			} catch (e) {
-				layersByPanel = {};
-			}
-		}
+		function loadDraft() {}
 
-		function saveDraft() {
-			try {
-				localStorage.setItem(
-					storageKey,
-					JSON.stringify({
-						v: STORAGE_VERSION,
-						panels: layersByPanel,
-					})
-				);
-			} catch (e) {
-				/* quota */
-			}
-		}
+		function saveDraft() {}
 
 		function hasAnyLayerContent() {
 			var k;
@@ -294,7 +309,11 @@
 				return o.toObject();
 			});
 			fixCanvasTextBaselineInPayloads(objs);
-			layersByPanel[String(activeIndex)] = { objects: objs };
+			layersByPanel[String(activeIndex)] = {
+				objects: objs,
+				baseW: fabricCanvas.getWidth() || 0,
+				baseH: fabricCanvas.getHeight() || 0,
+			};
 			saveDraft();
 			updateDraftDirtyFlag();
 		}
@@ -567,9 +586,10 @@
 		}
 
 		function getMaxStageSize() {
-			var maxW = wrapEl.clientWidth || root.clientWidth || 800;
-			maxW = Math.min(maxW, 920);
-			var maxH = Math.min(Math.round(window.innerHeight * 0.65), 640);
+			var maxW = Math.round(window.innerWidth - 48);
+			maxW = Math.max(360, Math.min(maxW, 1600));
+			var maxH = Math.round(window.innerHeight * 0.84);
+			maxH = Math.max(420, Math.min(maxH, 1100));
 			return { maxW: maxW, maxH: maxH };
 		}
 
@@ -671,60 +691,52 @@
 			syncToolbarFromSelection();
 		}
 
-		function renderPanelStaticToDataURL(panelIndex, cb) {
-			var el = document.createElement('canvas');
-			var sc = new fabric.StaticCanvas(el);
-			applyPanelContents(sc, panelIndex, PREVIEW_MAX_W, PREVIEW_MAX_H, function (ok) {
-				if (!ok) {
-					try {
-						sc.dispose();
-					} catch (e) {}
-					cb('');
-					return;
-				}
-				var url = '';
-				try {
-					url = sc.toDataURL({ format: 'png', quality: 1, multiplier: 1 });
-				} catch (e) {
-					url = '';
-				}
-				try {
-					sc.dispose();
-				} catch (e2) {}
-				cb(url);
-			});
-		}
-
-		function buildAllPreviewUrls(done) {
+		function buildAllPreviewSlides(done) {
 			saveCurrentPanelObjects();
-			var urls = [];
-			var i = 0;
-			function next() {
-				if (i >= panels.length) {
-					done(urls);
-					return;
-				}
-				renderPanelStaticToDataURL(i, function (dataUrl) {
-					urls.push(dataUrl);
-					i++;
-					next();
-				});
+			var sizes = getMaxStageSize();
+			if (!window.vcePanelRenderer || typeof window.vcePanelRenderer.buildPreviewSlides !== 'function') {
+				done([]);
+				return;
 			}
-			next();
+			window.vcePanelRenderer.buildPreviewSlides(panels, layersByPanel, sizes.maxW, sizes.maxH, done);
 		}
 
 		function setPreviewSlide(idx) {
-			previewIndex = clamp(idx, 0, Math.max(0, previewUrls.length - 1));
-			var url = previewUrls[previewIndex];
+			previewIndex = clamp(idx, 0, Math.max(0, previewSlides.length - 1));
+			var slide = previewSlides[previewIndex] || {};
+			if (modalFrame) {
+				var frameW = parseInt(slide.width, 10) || 0;
+				var frameH = parseInt(slide.height, 10) || 0;
+				if (frameW > 0 && frameH > 0) {
+					modalFrame.style.width = String(frameW) + 'px';
+					modalFrame.style.height = String(frameH) + 'px';
+				} else {
+					modalFrame.style.width = '';
+					modalFrame.style.height = '';
+				}
+			}
 			if (modalMain) {
-				modalMain.src = url || '';
+				if (isUsableImageUrl(slide.baseUrl)) {
+					modalMain.src = String(slide.baseUrl).trim();
+				} else {
+					modalMain.removeAttribute('src');
+				}
+			}
+			if (modalOverlay) {
+				if (isUsableOverlayUrl(slide.overlayUrl)) {
+					modalOverlay.src = String(slide.overlayUrl).trim();
+					modalOverlay.removeAttribute('hidden');
+				} else {
+					modalOverlay.src = TRANSPARENT_PIXEL;
+					modalOverlay.setAttribute('hidden', 'hidden');
+				}
 			}
 			var label =
 				(i18n.panelPreview || 'Card preview') +
 				' · ' +
 				(previewIndex + 1) +
 				' / ' +
-				previewUrls.length;
+				previewSlides.length;
 			if (modalTitle) {
 				modalTitle.textContent = label;
 			}
@@ -738,7 +750,7 @@
 				btnPrev.disabled = previewIndex <= 0;
 			}
 			if (btnNext) {
-				btnNext.disabled = previewIndex >= previewUrls.length - 1;
+				btnNext.disabled = previewIndex >= previewSlides.length - 1;
 			}
 		}
 
@@ -756,8 +768,8 @@
 				modalBody.setAttribute('hidden', 'hidden');
 			}
 
-			buildAllPreviewUrls(function (urls) {
-				previewUrls = urls;
+			buildAllPreviewSlides(function (slides) {
+				previewSlides = slides;
 				previewIndex = 0;
 				if (modalLoading) {
 					modalLoading.setAttribute('hidden', 'hidden');
@@ -778,9 +790,87 @@
 			unlockFullPagePreviewScroll();
 			unmountPreviewFromBody();
 			if (modalMain) {
-				modalMain.src = '';
+				modalMain.removeAttribute('src');
 			}
-			previewUrls = [];
+			if (modalOverlay) {
+				modalOverlay.src = TRANSPARENT_PIXEL;
+				modalOverlay.setAttribute('hidden', 'hidden');
+			}
+			if (modalFrame) {
+				modalFrame.style.width = '';
+				modalFrame.style.height = '';
+			}
+			previewSlides = [];
+		}
+
+		function setSubmissionLink(message, url) {
+			if (!submissionLink) {
+				return;
+			}
+			submissionLink.textContent = message || '';
+			if (url) {
+				submissionLink.href = url;
+				submissionLink.target = '_blank';
+				submissionLink.rel = 'noopener noreferrer';
+			} else {
+				submissionLink.removeAttribute('href');
+			}
+			if (message) {
+				submissionLink.removeAttribute('hidden');
+			} else {
+				submissionLink.setAttribute('hidden', 'hidden');
+			}
+		}
+
+		function saveSubmission() {
+			if (!btnSaveSubmission || !submissionApi.endpoint) {
+				return;
+			}
+			saveCurrentPanelObjects();
+			btnSaveSubmission.disabled = true;
+			btnSaveSubmission.textContent = i18n.savingSubmission || 'Saving...';
+
+			var headers = { 'Content-Type': 'application/json' };
+			if (submissionApi.nonce) {
+				headers['X-WP-Nonce'] = submissionApi.nonce;
+			}
+
+			fetch(submissionApi.endpoint, {
+				method: 'POST',
+				headers: headers,
+				credentials: 'same-origin',
+				body: JSON.stringify({
+					parentId: parseInt(root.getAttribute('data-source-card-id') || postId || '0', 10) || 0,
+					layers: layersByPanel,
+				}),
+			})
+				.then(function (res) {
+					return res.json().then(function (data) {
+						return { ok: res.ok, data: data };
+					});
+				})
+				.then(function (result) {
+					if (!result.ok || !result.data) {
+						throw new Error('save_failed');
+					}
+					var openUrl = result.data.preview_url || result.data.url || '';
+					if (!openUrl) {
+						throw new Error('save_failed');
+					}
+					var msg = i18n.submissionSaved || 'Submission saved. Opening preview...';
+					setSubmissionLink(msg, openUrl);
+					var popup = window.open(openUrl, '_blank');
+					if (!popup) {
+						window.location.href = openUrl;
+					}
+				})
+				.catch(function () {
+					setSubmissionLink(i18n.submissionFailed || 'Could not save submission.', '');
+				})
+				.finally(function () {
+					btnSaveSubmission.disabled = false;
+					btnSaveSubmission.textContent = i18n.saveSubmission || 'Save submission';
+				});
 		}
 
 		fabricCanvas.on('selection:created', syncToolbarFromSelection);
@@ -799,6 +889,9 @@
 		}
 		if (btnDel) {
 			btnDel.addEventListener('click', deleteSelected);
+		}
+		if (btnSaveSubmission) {
+			btnSaveSubmission.addEventListener('click', saveSubmission);
 		}
 		if (inputSize) {
 			inputSize.addEventListener('input', function () {
