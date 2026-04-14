@@ -19,4 +19,12 @@ class Panel_Meta {
 	public const META_KEY = '_virtual_card_panels';
 
 	public const SUBMISSION_LAYERS_META_KEY = '_vce_submission_layers';
+
+	public const WIX_META_KEY = '_ads_wix_card_id';
+
+	/**
+	 * Custom sort / display order for Virtual Cards (integer, 0 = default).
+	 */
+	public const ORDER_META_KEY = 'order';
+
 }
