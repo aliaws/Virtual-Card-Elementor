@@ -17,4 +17,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Panel_Meta {
 
 	public const META_KEY = '_virtual_card_panels';
+
+    public const WIX_META_KEY = '_ads_wix_card_id';
 }

@@ -23,6 +23,7 @@ class Post_Type {
 	 */
 	public function register_hooks(): void {
 		add_action( 'init', [ $this, 'register_post_type' ] );
+        add_action( 'init', [ $this, 'register_post_taxonomy' ] );
 	}
 
 	/**
@@ -42,5 +43,24 @@ class Post_Type {
 				'show_in_rest' => true,
 			]
 		);
+
 	}
+
+    public function register_post_taxonomy(): void {
+
+        register_taxonomy(
+            'virtual_card_category',
+            'virtual_card',
+            [
+                'label'        => 'Categories',
+                'hierarchical' => true,
+                'show_admin_column' => true, // 👈 IMPORTANT
+                'show_in_rest' => true,
+            ]
+        );
+
+        add_action('init', function () {
+            register_taxonomy_for_object_type('virtual_card_category', 'virtual_card');
+        });
+    }
 }
