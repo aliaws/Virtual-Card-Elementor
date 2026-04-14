@@ -98,7 +98,7 @@ When the current post is a `card_submission`, widget rendering falls back to the
 
 **Front-end editor and submissions**
 
-- Editor UI is rendered by `templates/frontend/card-panels-editor.php` and powered by `assets/js/frontend-panel-editor.js`.
+- Editor UI is rendered by `templates/frontend/card-panels-editor.php` and powered by `assets/js/frontend-panel-editor.js`. The toolbar supports **text color** and **text background** (Fabric `textBackgroundColor`, including per-range styles while editing).
 - Users can click **Save submission** in the front-end editor.
 - Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`).
 - Endpoint creates a new `card_submission`, sets **`post_parent`** to the source virtual card, stores the layer payload in **`_vce_submission_layers`**, and returns **`url`** / **`preview_url`** (query-string style `/?post_type=card_submission&p=ID` so the link works even if permalinks need a flush).

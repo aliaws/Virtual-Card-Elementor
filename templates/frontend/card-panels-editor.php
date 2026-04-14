@@ -122,6 +122,30 @@ if ( false === $saved_json ) {
 					</label>
 				</span>
 			</label>
+			<label class="vce-panel-editor__field vce-panel-editor__field--bg">
+				<span class="vce-panel-editor__field-label"><?php esc_html_e( 'Text background', VCE_TEXT_DOMAIN ); ?></span>
+				<span class="vce-panel-editor__color-tool">
+					<label class="vce-panel-editor__color-hit" title="<?php echo esc_attr__( 'Pick text background color', VCE_TEXT_DOMAIN ); ?>">
+						<span class="vce-sr-only"><?php esc_html_e( 'Text background color', VCE_TEXT_DOMAIN ); ?></span>
+						<input
+							type="color"
+							class="vce-panel-editor__color-input"
+							data-vce-text-bg-color
+							value="#ffffff"
+							aria-label="<?php echo esc_attr__( 'Text background color', VCE_TEXT_DOMAIN ); ?>"
+						/>
+					</label>
+					<button
+						type="button"
+						class="vce-panel-editor__btn-clear-bg"
+						data-vce-clear-text-bg
+						disabled
+						aria-label="<?php echo esc_attr__( 'Clear text background', VCE_TEXT_DOMAIN ); ?>"
+					>
+						<?php esc_html_e( 'Clear', VCE_TEXT_DOMAIN ); ?>
+					</button>
+				</span>
+			</label>
 			<div
 				class="vce-panel-editor__format-group"
 				role="group"

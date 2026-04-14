@@ -158,6 +158,8 @@
 		var submissionLink = root.querySelector('[data-vce-submission-link]');
 		var inputSize = root.querySelector('[data-vce-font-size]');
 		var inputColor = root.querySelector('[data-vce-text-color]');
+		var inputBgColor = root.querySelector('[data-vce-text-bg-color]');
+		var btnClearTextBg = root.querySelector('[data-vce-clear-text-bg]');
 		var selectFont = root.querySelector('[data-vce-font-family]');
 		var btnBold = root.querySelector('[data-vce-text-bold]');
 		var btnItalic = root.querySelector('[data-vce-text-italic]');
@@ -372,6 +374,16 @@
 			});
 		}
 
+		function hasTextBackgroundColor(val) {
+			if (val == null) {
+				return false;
+			}
+			if (typeof val === 'string') {
+				return val.trim() !== '';
+			}
+			return true;
+		}
+
 		function getTextStyleSnapshot(obj) {
 			if (!isTextObject(obj)) {
 				return null;
@@ -383,12 +395,14 @@
 					fontStyle: obj.fontStyle,
 					underline: !!obj.underline,
 					fill: obj.fill,
+					textBackgroundColor: obj.textBackgroundColor,
 				};
 			}
 			var fw;
 			var fs;
 			var ul;
 			var fl;
+			var tbg;
 			if (obj.isEditing) {
 				var a = Math.min(obj.selectionStart, obj.selectionEnd);
 				var b = Math.max(obj.selectionStart, obj.selectionEnd);
@@ -417,17 +431,23 @@
 				fs = st.fontStyle !== undefined && st.fontStyle !== '' ? st.fontStyle : obj.fontStyle;
 				ul = st.underline !== undefined ? st.underline : obj.underline;
 				fl = st.fill !== undefined && st.fill !== null && st.fill !== '' ? st.fill : obj.fill;
+				tbg =
+					st.textBackgroundColor !== undefined && st.textBackgroundColor !== null && st.textBackgroundColor !== ''
+						? st.textBackgroundColor
+						: obj.textBackgroundColor;
 			} else {
 				fw = obj.fontWeight;
 				fs = obj.fontStyle;
 				ul = obj.underline;
 				fl = obj.fill;
+				tbg = obj.textBackgroundColor;
 			}
 			return {
 				fontWeight: fw,
 				fontStyle: fs,
 				underline: !!ul,
 				fill: fl,
+				textBackgroundColor: tbg,
 			};
 		}
 
@@ -472,12 +492,12 @@
 		}
 
 		function setFormatButtonsEnabled(on) {
-			[btnBold, btnItalic, btnUnderline].forEach(function (b) {
+			[btnBold, btnItalic, btnUnderline, btnClearTextBg].forEach(function (b) {
 				if (!b) {
 					return;
 				}
 				b.disabled = !on;
-				if (!on) {
+				if (!on && b.getAttribute && b.getAttribute('aria-pressed') != null) {
 					b.setAttribute('aria-pressed', 'false');
 					b.classList.remove('is-active');
 				}
@@ -494,6 +514,13 @@
 				var snap = getTextStyleSnapshot(obj);
 				if (inputColor && snap) {
 					inputColor.value = fillToHex(snap.fill);
+				}
+				if (inputBgColor && snap) {
+					if (hasTextBackgroundColor(snap.textBackgroundColor)) {
+						inputBgColor.value = fillToHex(snap.textBackgroundColor);
+					} else {
+						inputBgColor.value = '#ffffff';
+					}
 				}
 				if (snap) {
 					syncColorPresetSelect(snap.fill);
@@ -523,6 +550,9 @@
 				}
 				setFormatButtonsEnabled(false);
 				syncColorPresetSelect(inputColor ? inputColor.value : '');
+				if (inputBgColor) {
+					inputBgColor.value = '#ffffff';
+				}
 			}
 		}
 
@@ -684,6 +714,44 @@
 				obj.setSelectionStyles({ fill: hex });
 			} else {
 				obj.set('fill', hex);
+			}
+			obj.dirty = true;
+			fabricCanvas.requestRenderAll();
+			saveCurrentPanelObjects();
+			syncToolbarFromSelection();
+		}
+
+		function applyTextBackground() {
+			if (!inputBgColor) {
+				return;
+			}
+			var hex = inputBgColor.value;
+			var obj = fabricCanvas.getActiveObject();
+			if (!isTextObject(obj)) {
+				return;
+			}
+			var hasRange = obj.isEditing && obj.selectionStart !== obj.selectionEnd;
+			if (hasRange) {
+				obj.setSelectionStyles({ textBackgroundColor: hex });
+			} else {
+				obj.set('textBackgroundColor', hex);
+			}
+			obj.dirty = true;
+			fabricCanvas.requestRenderAll();
+			saveCurrentPanelObjects();
+			syncToolbarFromSelection();
+		}
+
+		function clearTextBackground() {
+			var obj = fabricCanvas.getActiveObject();
+			if (!isTextObject(obj)) {
+				return;
+			}
+			var hasRange = obj.isEditing && obj.selectionStart !== obj.selectionEnd;
+			if (hasRange) {
+				obj.setSelectionStyles({ textBackgroundColor: '' });
+			} else {
+				obj.set('textBackgroundColor', '');
 			}
 			obj.dirty = true;
 			fabricCanvas.requestRenderAll();
@@ -901,6 +969,12 @@
 		}
 		if (inputColor) {
 			inputColor.addEventListener('input', applyColor);
+		}
+		if (inputBgColor) {
+			inputBgColor.addEventListener('input', applyTextBackground);
+		}
+		if (btnClearTextBg) {
+			btnClearTextBg.addEventListener('click', clearTextBackground);
 		}
 		if (selectColorPreset) {
 			selectColorPreset.addEventListener('change', function () {
