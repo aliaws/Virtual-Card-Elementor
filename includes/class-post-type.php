@@ -21,9 +21,13 @@ class Post_Type {
 	public const CARD_SUBMISSION_POST_TYPE = 'card_submission';
 
 	public function register_hooks(): void {
+
 		add_action( 'init', [ $this, 'register_post_types' ] );
 		// Meta box parent field is POSTed on save; block editor uses REST without that POST.
 		add_filter( 'use_block_editor_for_post_type', [ $this, 'classic_editor_for_submissions' ], 10, 2 );
+
+
+        add_action( 'init', [ $this, 'register_post_taxonomy' ] );
 	}
 
 	public function classic_editor_for_submissions( bool $use, string $post_type ): bool {
@@ -44,6 +48,7 @@ class Post_Type {
 				'show_in_rest' => true,
 			]
 		);
+
 
 		register_post_type(
 			self::CARD_SUBMISSION_POST_TYPE,
@@ -71,6 +76,11 @@ class Post_Type {
 			]
 		);
 
+
+	}
+
+    public function register_post_taxonomy(): void {
+
         register_taxonomy(
             'virtual_card_category',
             'virtual_card',
@@ -85,5 +95,8 @@ class Post_Type {
         add_action('init', function () {
             register_taxonomy_for_object_type('virtual_card_category', 'virtual_card');
         });
-	}
+
+        add_filter('use_block_editor_for_post', '__return_false', 10);
+
+    }
 }

@@ -149,7 +149,7 @@ class Panel_Meta_Box {
 		if ( ! empty( $_POST[ self::IDS_FIELD ] ) ) {
 			$raw = sanitize_text_field( wp_unslash( $_POST[ self::IDS_FIELD ] ) );
 			$ids = array_map( 'intval', array_filter( explode( ',', $raw ) ) );
-			update_post_meta( $post_id, Panel_Meta::META_KEY, $ids );
+            update_post_meta( $post_id, Panel_Meta::META_KEY, $ids );
 			return;
 		}
 

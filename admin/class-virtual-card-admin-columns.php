@@ -39,7 +39,9 @@ class Virtual_Card_Admin_Columns {
 			$new[ $key ] = $label;
 			if ( 'title' === $key ) {
 				$new['vce_panels']  = __( 'No. of panels', VCE_TEXT_DOMAIN );
+                $new['wix_id']  = __( 'WIX ID', VCE_TEXT_DOMAIN );
 			}
+
 		}
 		return $new;
 	}
@@ -52,16 +54,19 @@ class Virtual_Card_Admin_Columns {
 	 */
 	public function render_column( string $column_name, int $post_id ): void {
 
-		if ( 'vce_panels' !== $column_name ) {
-			return;
+		if ( 'vce_panels' == $column_name ) {
+            $ids = get_post_meta( $post_id, Panel_Meta::META_KEY, true );
+            if ( ! is_array( $ids ) ) {
+                $ids = [];
+            }
+            $ids = array_filter( array_map( 'intval', $ids ) );
+            echo esc_html( (string) count( $ids ) );
 		}
+        if ( 'wix_id' == $column_name ) {
+            $wix_id = get_post_meta( $post_id, Panel_Meta::WIX_META_KEY, true );
+            echo $wix_id;
+        }
 
-		$ids = get_post_meta( $post_id, Panel_Meta::META_KEY, true );
-		if ( ! is_array( $ids ) ) {
-			$ids = [];
-		}
-		$ids = array_filter( array_map( 'intval', $ids ) );
-		echo esc_html( (string) count( $ids ) );
 	}
 
 }
