@@ -62,5 +62,8 @@ class Post_Type {
         add_action('init', function () {
             register_taxonomy_for_object_type('virtual_card_category', 'virtual_card');
         });
+
+        add_filter('use_block_editor_for_post', '__return_false', 10);
+
     }
 }
