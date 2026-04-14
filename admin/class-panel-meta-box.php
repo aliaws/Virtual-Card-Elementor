@@ -28,15 +28,16 @@ class Panel_Meta_Box {
 	 * Hook callbacks.
 	 */
 	public function register_hooks(): void {
-		add_action( 'add_meta_boxes', [ $this, 'add_meta_box' ] );
+		add_action( 'add_meta_boxes', [ $this, 'register_meta_boxes' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_action( 'save_post_' . Post_Type::POST_TYPE, [ $this, 'save_panels' ], 10, 3 );
+		add_action( 'save_post_' . Post_Type::POST_TYPE, [ $this, 'save_display_order' ], 11, 3 );
 	}
 
 	/**
-	 * Register the meta box.
+	 * Register meta boxes on the Virtual Card edit screen.
 	 */
-	public function add_meta_box(): void {
+	public function register_meta_boxes(): void {
 		add_meta_box(
 			'virtual_card_panels',
 			__( 'Card Panels', VCE_TEXT_DOMAIN ),
@@ -45,6 +46,79 @@ class Panel_Meta_Box {
 			'normal',
 			'high'
 		);
+
+		add_meta_box(
+			'virtual_card_display_order',
+			__( 'Display order', VCE_TEXT_DOMAIN ),
+			[ $this, 'render_display_order_meta_box' ],
+			Post_Type::POST_TYPE,
+			'normal',
+			'default'
+		);
+	}
+
+	/**
+	 * Display order (integer meta) — separate box so the panels nonce stays single-use in the Card Panels UI.
+	 *
+	 * @param \WP_Post $post Post object.
+	 */
+	public function render_display_order_meta_box( $post ): void {
+		wp_nonce_field( 'vce_display_order_save', 'vce_display_order_nonce_field' );
+		$order = (int) get_post_meta( $post->ID, Panel_Meta::ORDER_META_KEY, true );
+		?>
+		<p>
+			<label for="vce_display_order"><?php esc_html_e( 'Order', VCE_TEXT_DOMAIN ); ?></label>
+			<input
+				type="number"
+				id="vce_display_order"
+				name="vce_display_order"
+				value="<?php echo esc_attr( (string) $order ); ?>"
+				min="0"
+				step="1"
+				class="small-text"
+			/>
+		</p>
+		<p class="description">
+			<?php esc_html_e( 'Optional sort key: lower numbers sort first where the theme or queries use this value. Leave 0 to clear custom ordering.', VCE_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Persist display order meta.
+	 *
+	 * @param int      $post_id Post ID.
+	 * @param \WP_Post $post    Post object.
+	 * @param bool     $update  Whether this is an update.
+	 */
+	public function save_display_order( int $post_id, $post, bool $update ): void { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable
+		if ( ! isset( $_POST['vce_display_order_nonce_field'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['vce_display_order_nonce_field'] ) ), 'vce_display_order_save' ) ) {
+			return;
+		}
+
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		$order = isset( $_POST['vce_display_order'] ) ? (int) $_POST['vce_display_order'] : 0;
+		if ( $order < 0 ) {
+			$order = 0;
+		}
+
+		if ( 0 === $order ) {
+			delete_post_meta( $post_id, Panel_Meta::ORDER_META_KEY );
+			return;
+		}
+
+		update_post_meta( $post_id, Panel_Meta::ORDER_META_KEY, $order );
 	}
 
 	/**
@@ -149,7 +223,7 @@ class Panel_Meta_Box {
 		if ( ! empty( $_POST[ self::IDS_FIELD ] ) ) {
 			$raw = sanitize_text_field( wp_unslash( $_POST[ self::IDS_FIELD ] ) );
 			$ids = array_map( 'intval', array_filter( explode( ',', $raw ) ) );
-            update_post_meta( $post_id, Panel_Meta::META_KEY, $ids );
+			update_post_meta( $post_id, Panel_Meta::META_KEY, $ids );
 			return;
 		}
 

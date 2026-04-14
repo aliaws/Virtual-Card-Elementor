@@ -79,24 +79,18 @@ class Post_Type {
 
 	}
 
-    public function register_post_taxonomy(): void {
-
-        register_taxonomy(
-            'virtual_card_category',
-            'virtual_card',
-            [
-                'label'        => 'Categories',
-                'hierarchical' => true,
-                'show_admin_column' => true, // 👈 IMPORTANT
-                'show_in_rest' => true,
-            ]
-        );
-
-        add_action('init', function () {
-            register_taxonomy_for_object_type('virtual_card_category', 'virtual_card');
-        });
-
-        add_filter('use_block_editor_for_post', '__return_false', 10);
-
-    }
+	public function register_post_taxonomy(): void {
+		register_taxonomy(
+			'virtual_card_category',
+			self::POST_TYPE,
+			[
+				'label'             => __( 'Categories', VCE_TEXT_DOMAIN ),
+				'hierarchical'      => true,
+				'show_admin_column' => true,
+				'show_in_rest'      => true,
+				'public'            => true,
+				'show_ui'           => true,
+			]
+		);
+	}
 }
