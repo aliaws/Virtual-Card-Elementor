@@ -32,7 +32,12 @@ class Panel_Meta_Box {
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_action( 'save_post_' . Post_Type::POST_TYPE, [ $this, 'save_panels' ], 10, 3 );
 		add_action( 'save_post_' . Post_Type::POST_TYPE, [ $this, 'save_display_order' ], 11, 3 );
-	}
+
+        add_filter('manage_virtual_card_posts_columns', [$this, 'add_virtual_card_image_column']);
+        add_action('manage_virtual_card_posts_custom_column', [$this, 'render_virtual_card_image_column'], 10, 2);
+
+
+    }
 
 	/**
 	 * Register meta boxes on the Virtual Card edit screen.
@@ -229,4 +234,35 @@ class Panel_Meta_Box {
 
 		delete_post_meta( $post_id, Panel_Meta::META_KEY );
 	}
+
+    public function add_virtual_card_image_column(array $columns): array
+    {
+        $new_columns = [];
+        foreach ($columns as $key => $label) {
+            if ($key === 'title') {
+                $new_columns['ads_card_image'] = __('Image', 'accurate-digital-stripe-subscriptions');
+            }
+            $new_columns[$key] = $label;
+        }
+
+        if (! isset($new_columns['ads_card_image'])) {
+            $new_columns = ['ads_card_image' => __('Image', 'accurate-digital-stripe-subscriptions')] + $new_columns;
+        }
+
+        return $new_columns;
+    }
+
+    public function render_virtual_card_image_column(string $column, int $post_id): void
+    {
+        if ($column !== 'ads_card_image') {
+            return;
+        }
+
+        if (has_post_thumbnail($post_id)) {
+            echo get_the_post_thumbnail($post_id, [50, 50], ['style' => 'width:50px;height:50px;object-fit:cover;border-radius:4px;']);
+            return;
+        }
+
+        echo '&mdash;';
+    }
 }

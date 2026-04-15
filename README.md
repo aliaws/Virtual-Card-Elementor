@@ -119,6 +119,7 @@ On **Virtual Cards → All Virtual Cards**:
 
 | Column | Meaning |
 |--------|---------|
+| **Image** | Featured image thumbnail (`50x50`, rounded) from the Virtual Card post thumbnail; shows **—** when no thumbnail is set. |
 | **No. of panels** | Count of attachment IDs in **`_virtual_card_panels`**. |
 | **WIX ID** | Value of **`_ads_wix_card_id`** (`Panel_Meta::WIX_META_KEY`), or **—** when empty. There is no dedicated admin field in this plugin for that key; it is intended for integrations or external sync that set the meta directly. |
 
