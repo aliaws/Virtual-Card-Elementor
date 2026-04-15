@@ -48,11 +48,8 @@ $count = count( $ids );
 			<div class="vce-panel-meta__stage-empty" data-vce-panel-stage-empty>
 				<?php esc_html_e( 'No panels yet. Use “Add images” to start.', VCE_TEXT_DOMAIN ); ?>
 			</div>
-			<div class="vce-panel-meta__stage-frame" data-vce-panel-stage-frame hidden>
+			<div class="vce-panel-meta__stage-frame">
 				<img class="vce-panel-meta__stage-img" src="" alt="" data-vce-panel-stage-img />
-				<button type="button" class="button vce-panel-meta__stage-expand" data-vce-panel-expand>
-					<?php esc_html_e( 'Full preview', VCE_TEXT_DOMAIN ); ?>
-				</button>
 			</div>
 		</div>
 	</div>
@@ -72,7 +69,7 @@ $count = count( $ids );
 				}
 				?>
 				<li
-					class="vce-panel-meta__item"
+					class="vce-panel-meta__item ui-state-default"
 					data-id="<?php echo esc_attr( (string) $aid ); ?>"
 					data-preview-url="<?php echo esc_url( $prev ); ?>"
 				>
