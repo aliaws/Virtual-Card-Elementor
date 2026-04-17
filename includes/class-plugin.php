@@ -24,6 +24,7 @@ require_once VCE_PLUGIN_DIR . 'includes/class-debug-log.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-vce-debug-page.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-vce-debug-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-submission-rest.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-user-account.php';
 
 /**
  * Loads components and hooks.
@@ -88,6 +89,9 @@ class Plugin {
 
 		$attachment_tags = new Attachment_Tags();
 		$attachment_tags->register_hooks();
+
+		$user_account = new User_Account();
+		$user_account->register_hooks();
 
 		add_action( 'elementor/widgets/register', [ $this, 'register_elementor_widget' ] );
 		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_elementor_frontend_assets' ] );
