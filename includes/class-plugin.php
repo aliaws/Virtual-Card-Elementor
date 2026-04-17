@@ -24,6 +24,7 @@ require_once VCE_PLUGIN_DIR . 'includes/class-debug-log.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-vce-debug-page.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-vce-debug-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-submission-rest.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-user-account.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-um-hooks.php';
 
 /**
@@ -90,6 +91,8 @@ class Plugin {
 		$attachment_tags = new Attachment_Tags();
 		$attachment_tags->register_hooks();
 
+		$user_account = new User_Account();
+		$user_account->register_hooks();
 		$um_hooks = new Um_Hooks();
 		$um_hooks->register_hooks();
 
