@@ -25,6 +25,7 @@ If you used an earlier copy of this plugin that stored images under **`_virtual_
 ### Bootstrap: `virtual-card-elementor.php`
 
 - Defines **`VCE_VERSION`** from the **`Version`** field in this file’s plugin header via **`get_file_data()`**, so the header stays the single source of truth for the release number.
+- Defines **`vce_asset_version( $relative_path )`**: returns **`VCE_VERSION`** plus the file’s **`mtime`** when the asset exists, so enqueued CSS/JS get reliable cache-busting after edits.
 - Defines path/url constants, text domain, loads PHP class files, runs `Plugin::instance()->run()`.
 
 **Custom post type `virtual_card` (`Post_Type` on `init`)**
@@ -36,6 +37,16 @@ If you used an earlier copy of this plugin that stored images under **`_virtual_
 | `menu_icon` | `dashicons-images-alt2` |
 | `supports` | `title`, `editor`, `thumbnail` |
 | `show_in_rest` | `true` |
+
+**Taxonomy `virtual_card_category` (`Post_Type::register_post_taxonomy` on `init`)**
+
+| Argument | Value |
+|----------|--------|
+| `object_types` | `virtual_card` |
+| `hierarchical` | `true` (behaves like categories) |
+| `show_admin_column` | `true` (term column on the Virtual Cards list) |
+| `show_in_rest` | `true` |
+| `public` / `show_ui` | `true` |
 
 **Custom post type `card_submission` (`Post_Type` on `init`)**
 
@@ -49,14 +60,34 @@ If you used an earlier copy of this plugin that stored images under **`_virtual_
 | `rewrite` | `slug` = `card-submission` |
 | `query_var` | `card_submission` |
 
+**Classic editor for submissions**
+
+- Filter **`use_block_editor_for_post_type`**: **`card_submission`** uses the **classic** editor so parent meta boxes POST as expected; other post types are unchanged.
+
+**Shared meta keys (`Panel_Meta`)**
+
+| Constant | Meta key | Role |
+|----------|----------|------|
+| `META_KEY` | **`_virtual_card_panels`** | Ordered attachment IDs for Card Panels |
+| `SUBMISSION_LAYERS_META_KEY` | **`_vce_submission_layers`** | Front-end submission layer payload (per panel index) |
+| `WIX_META_KEY` | **`_ads_wix_card_id`** | External Wix / sync identifier (string) |
+| `ORDER_META_KEY` | **`order`** | Optional integer sort key (`0` clears stored meta); constant name is still `ORDER_META_KEY`, value is the bare meta key **`order`**. |
+
 **Admin: Card Panels meta box (`Panel_Meta_Box`)**
 
 - Hook: `add_meta_boxes`
 - Box id: `virtual_card_panels`, title **Card Panels**, screen `virtual_card`, context `normal`, priority `high`
 - Reads/writes meta key **`_virtual_card_panels`**: list of attachment IDs when saved.
 - Nonce: action `virtual_card_panel_nonce`, field **`virtual_card_panel_nonce_field`**.
-- Hidden input **`virtual_card_panel_ids`**: comma-separated attachment IDs; **`assets/js/admin-panel.js`** updates it when adding/removing rows.
+- Hidden input **`virtual_card_panel_ids`**: comma-separated attachment IDs; **`assets/js/admin-panel.js`** updates it when adding/removing rows (reorder, preview modal, etc.).
+- Enqueues use **`vce_asset_version()`** for **`assets/css/admin-panel.css`** and **`assets/js/admin-panel.js`** (script dependencies include **`jquery-ui-sortable`** and **`media-editor`**).
 - Styles: **`assets/css/admin-panel.css`**. Markup: **`templates/admin/panel-meta-box.php`**.
+
+**Admin: Display order meta box (`Panel_Meta_Box`)**
+
+- Second meta box id **`virtual_card_display_order`**, title **Display order**, same screen, context **`normal`**, priority **`default`** (below Card Panels).
+- Field **`vce_display_order`** (number, min `0`). Nonce action **`vce_display_order_save`**, field **`vce_display_order_nonce_field`**.
+- Saved on **`save_post_virtual_card`** (priority **11**) into post meta key **`order`** (`Panel_Meta::ORDER_META_KEY`). **`0`** deletes meta (no custom order).
 
 **Saving panels (`save_post_virtual_card` → `Panel_Meta_Box::save_panels`)**
 
@@ -64,12 +95,17 @@ Runs only if the panel nonce is present and verifies. If **`virtual_card_panel_i
 
 **Virtual Cards admin list (`Virtual_Card_Admin_Columns`)**
 
-On **Virtual Cards → All Virtual Cards**, two columns are inserted after **Title**:
+On **Virtual Cards → All Virtual Cards**:
+
+- **Category filter**: **`restrict_manage_posts`** outputs a **`virtual_card_category`** dropdown (same GET parameter name). **`parse_query`** applies a **`tax_query`** when a term is selected so the list matches that category (includes child terms).
+- **Extra columns** (inserted after **Title**):
 
 | Column | Meaning |
 |--------|---------|
-| **No. of cards** | Always **`1`** for each row (one Virtual Card post = one card). |
-| **No. of panels** | Count of attachment IDs stored in **`_virtual_card_panels`** for that post. |
+| **No. of panels** | Count of attachment IDs in **`_virtual_card_panels`**. |
+| **WIX ID** | Value of **`_ads_wix_card_id`** (`Panel_Meta::WIX_META_KEY`), or **—** when empty. |
+
+The taxonomy also registers **`show_admin_column`** so WordPress adds its own **Categories** column where terms are assigned.
 
 **Card Submissions admin (`Card_Submission_Admin`)**
 

@@ -21,9 +21,13 @@ class Post_Type {
 	public const CARD_SUBMISSION_POST_TYPE = 'card_submission';
 
 	public function register_hooks(): void {
+
 		add_action( 'init', [ $this, 'register_post_types' ] );
 		// Meta box parent field is POSTed on save; block editor uses REST without that POST.
 		add_filter( 'use_block_editor_for_post_type', [ $this, 'classic_editor_for_submissions' ], 10, 2 );
+
+
+        add_action( 'init', [ $this, 'register_post_taxonomy' ] );
 	}
 
 	public function classic_editor_for_submissions( bool $use, string $post_type ): bool {
@@ -44,6 +48,7 @@ class Post_Type {
 				'show_in_rest' => true,
 			]
 		);
+
 
 		register_post_type(
 			self::CARD_SUBMISSION_POST_TYPE,
@@ -71,19 +76,21 @@ class Post_Type {
 			]
 		);
 
-        register_taxonomy(
-            'virtual_card_category',
-            'virtual_card',
-            [
-                'label'        => 'Categories',
-                'hierarchical' => true,
-                'show_admin_column' => true, // 👈 IMPORTANT
-                'show_in_rest' => true,
-            ]
-        );
 
-        add_action('init', function () {
-            register_taxonomy_for_object_type('virtual_card_category', 'virtual_card');
-        });
+	}
+
+	public function register_post_taxonomy(): void {
+		register_taxonomy(
+			'virtual_card_category',
+			self::POST_TYPE,
+			[
+				'label'             => __( 'Categories', VCE_TEXT_DOMAIN ),
+				'hierarchical'      => true,
+				'show_admin_column' => true,
+				'show_in_rest'      => true,
+				'public'            => true,
+				'show_ui'           => true,
+			]
+		);
 	}
 }
