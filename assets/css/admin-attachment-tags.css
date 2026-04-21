@@ -1,0 +1,26 @@
+/**
+ * Tagify in media sidebar / attachment edit.
+ */
+
+.compat-field-vce_tags .field,
+.attachment-details .compat-field-vce_tags {
+	max-width: 100%;
+}
+
+.compat-field-vce_tags input.vce-attachment-tags-input,
+.media-sidebar .vce-attachment-tags-input {
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.media-sidebar .tagify,
+.attachment-details .tagify {
+	width: 100%;
+	max-width: 100%;
+}
+
+.vce-tagify-dropdown .tagify__dropdown__wrapper {
+	max-height: 220px;
+	overflow-y: auto;
+}

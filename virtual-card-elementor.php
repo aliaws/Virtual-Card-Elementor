@@ -1,346 +1,83 @@
 <?php
 /**
  * Plugin Name: Virtual Card Elementor
+ * Description: Registers the Virtual Card custom post type, admin Card Panels (images per card), and an Elementor widget that outputs those panels for the current post in the loop.
+ * Version: 1.5.8
+ * Author: Accurate Digital Solutions
+ * Text Domain: virtual-card-elementor
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
+ *
+ * @package Virtual_Card_Elementor
  */
 
-if (!defined('ABSPATH')) exit;
-
-
-/**
- * 1. Register Virtual Card CPT
- */
-add_action('init', function () {
-
-    register_post_type(
-        'virtual_card',
-        [
-            'label' => 'Virtual Cards',
-            'public' => true,
-            'menu_icon' => 'dashicons-format-gallery',
-
-            'supports' => [
-                'title',
-                'editor',
-                'thumbnail'
-            ],
-
-            'show_in_rest' => true
-        ]
-    );
-
-});
-
-
-
-/**
- * 2. Add gallery meta to Virtual Card
- */
-add_action('add_meta_boxes', function () {
-
-    add_meta_box(
-        'virtual_card_gallery',
-        'Card Gallery',
-        'virtual_card_gallery_html',
-        'virtual_card',
-        'normal',
-        'high'
-    );
-
-});
-
-
-
-function virtual_card_gallery_html($post)
-{
-    $ids = get_post_meta(
-        $post->ID,
-        '_virtual_card_gallery',
-        true
-    );
-
-    $ids = is_array($ids) ? $ids : [];
-
-    wp_nonce_field(
-        'virtual_card_nonce',
-        'virtual_card_nonce_field'
-    );
-
-?>
-
-<div>
-
-    <ul id="virtual_card_list">
-
-        <?php foreach ($ids as $id): ?>
-
-            <li data-id="<?php echo $id ?>">
-
-                <?php echo wp_get_attachment_image($id,'thumbnail'); ?>
-
-                <a href="#" class="remove">×</a>
-
-            </li>
-
-        <?php endforeach; ?>
-
-    </ul>
-
-
-    <input
-        type="hidden"
-        name="virtual_card_ids"
-        id="virtual_card_ids"
-        value="<?php echo esc_attr(
-            implode(',', $ids)
-        ); ?>"
-    >
-
-
-    <button class="button" id="virtual_card_add">
-
-        Add Images
-
-    </button>
-
-</div>
-
-
-
-<style>
-
-#virtual_card_list{
-display:flex;
-gap:10px;
-flex-wrap:wrap;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
-#virtual_card_list img{
-width:80px;
-height:80px;
-object-fit:cover;
+$plugin_data = get_file_data( __FILE__, [ 'Version' => 'Version' ], 'plugin' );
+define( 'VCE_VERSION', $plugin_data['Version'] );
+
+define( 'VCE_PLUGIN_FILE', __FILE__ );
+define( 'VCE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'VCE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'VCE_TEXT_DOMAIN', 'virtual-card-elementor' );
+
+if ( ! function_exists( 'vce_asset_version' ) ) {
+	/**
+	 * Cache-busting version for enqueued CSS/JS: release version + file mtime.
+	 *
+	 * @param string $relative_path Path under the plugin directory, e.g. assets/js/frontend-panel-editor.js
+	 */
+	function vce_asset_version( string $relative_path ): string {
+		$relative_path = str_replace( '\\', '/', ltrim( $relative_path, '/' ) );
+		$path          = VCE_PLUGIN_DIR . $relative_path;
+		if ( is_readable( $path ) ) {
+			$mtime = filemtime( $path );
+			if ( false !== $mtime ) {
+				return VCE_VERSION . '.' . $mtime;
+			}
+		}
+		return VCE_VERSION;
+	}
 }
 
-#virtual_card_list li{
-position:relative;
+if ( ! defined( 'VCE_DEBUG' ) ) {
+	define( 'VCE_DEBUG', false );
 }
 
-#virtual_card_list .remove{
+require_once VCE_PLUGIN_DIR . 'includes/class-panel-meta.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-template.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-editor-access.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-post-type.php';
+require_once VCE_PLUGIN_DIR . 'admin/class-panel-meta-box.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-plugin.php';
 
-position:absolute;
-right:-5px;
-top:-5px;
-background:red;
-color:white;
-padding:2px 6px;
-
+if ( ! function_exists( 'vce_get_front_editor_mode' ) ) {
+	/**
+	 * Front-end editor mode: logged_in or guest.
+	 *
+	 * @return string
+	 */
+	function vce_get_front_editor_mode(): string {
+		return Virtual_Card_Elementor\Editor_Access::get_mode();
+	}
 }
 
-</style>
+if ( ! function_exists( 'vce_can_use_front_editor' ) ) {
+	/**
+	 * Whether the current visitor may use the front-end editor UI.
+	 */
+	function vce_can_use_front_editor(): bool {
+		return Virtual_Card_Elementor\Editor_Access::can_use_front_editor();
+	}
+}
 
-
-
-<script>
-
-jQuery(function($){
-
-let frame;
-
-$('#virtual_card_add').click(function(e){
-
-e.preventDefault();
-
-frame = wp.media({
-
-title:'Select Images',
-
-multiple:true
-
-});
-
-
-frame.on('select',function(){
-
-let selection =
-frame.state()
-.get('selection')
-.toJSON();
-
-
-let ids =
-$('#virtual_card_ids')
-.val()
-? $('#virtual_card_ids')
-.val()
-.split(',')
-: [];
-
-
-selection.forEach(img => {
-
-ids.push(img.id);
-
-
-$('#virtual_card_list').append(
-
-`<li data-id="${img.id}">
-
-<img src="${img.sizes.thumbnail.url}">
-
-<a href="#" class="remove">×</a>
-
-</li>`
-
+register_activation_hook(
+	VCE_PLUGIN_FILE,
+	static function (): void {
+		add_option( 'vce_flush_rewrite_rules', '1' );
+	}
 );
 
-});
-
-
-$('#virtual_card_ids')
-.val(ids.join(','));
-
-});
-
-
-frame.open();
-
-});
-
-
-
-$(document).on(
-'click',
-'.remove',
-function(e){
-
-e.preventDefault();
-
-
-let li =
-$(this).closest('li');
-
-
-let id =
-li.data('id');
-
-
-let ids =
-$('#virtual_card_ids')
-.val()
-.split(',');
-
-
-ids =
-ids.filter(v => v != id);
-
-
-$('#virtual_card_ids')
-.val(ids.join(','));
-
-
-li.remove();
-
-});
-
-});
-
-</script>
-
-
-<?php
-}
-
-
-/**
- * save gallery
- */
-add_action(
-'save_post_virtual_card',
-function ($post_id) {
-
-if (
-!isset(
-$_POST[
-'virtual_card_nonce_field'
-]
-)
-) return;
-
-
-if (
-!wp_verify_nonce(
-$_POST[
-'virtual_card_nonce_field'
-],
-'virtual_card_nonce'
-)
-) return;
-
-
-
-if (!empty(
-$_POST['virtual_card_ids']
-)) {
-
-$ids =
-array_map(
-'intval',
-explode(
-',',
-$_POST[
-'virtual_card_ids'
-]
-)
-);
-
-
-update_post_meta(
-
-$post_id,
-
-'_virtual_card_gallery',
-
-$ids
-
-);
-
-}
-
-else {
-
-delete_post_meta(
-
-$post_id,
-
-'_virtual_card_gallery'
-
-);
-
-}
-
-}
-);
-
-
-
-
-/**
- * 3. Elementor widget
- */
-add_action(
-'elementor/widgets/register',
-function ($widgets_manager) {
-
-require_once __DIR__ .
-'/virtual-card-widget.php';
-
-
-$widgets_manager
-->register(
-
-new
-\Virtual_Card_Widget()
-
-);
-
-});
-
+Virtual_Card_Elementor\Plugin::instance()->run();

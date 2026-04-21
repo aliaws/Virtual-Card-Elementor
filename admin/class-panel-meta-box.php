@@ -1,0 +1,268 @@
+<?php
+/**
+ * Admin panel meta box for Virtual Card.
+ *
+ * @package Virtual_Card_Elementor
+ */
+
+namespace Virtual_Card_Elementor\Admin;
+
+use Virtual_Card_Elementor\Panel_Meta;
+use Virtual_Card_Elementor\Post_Type;
+use Virtual_Card_Elementor\Template;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Card Panel meta box and save handler.
+ */
+class Panel_Meta_Box {
+
+	public const NONCE_ACTION = 'virtual_card_panel_nonce';
+	public const NONCE_FIELD  = 'virtual_card_panel_nonce_field';
+	public const IDS_FIELD    = 'virtual_card_panel_ids';
+
+	/**
+	 * Hook callbacks.
+	 */
+	public function register_hooks(): void {
+		add_action( 'add_meta_boxes', [ $this, 'register_meta_boxes' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		add_action( 'save_post_' . Post_Type::POST_TYPE, [ $this, 'save_panels' ], 10, 3 );
+		add_action( 'save_post_' . Post_Type::POST_TYPE, [ $this, 'save_display_order' ], 11, 3 );
+
+        add_filter('manage_virtual_card_posts_columns', [$this, 'add_virtual_card_image_column']);
+        add_action('manage_virtual_card_posts_custom_column', [$this, 'render_virtual_card_image_column'], 10, 2);
+
+
+    }
+
+	/**
+	 * Register meta boxes on the Virtual Card edit screen.
+	 */
+	public function register_meta_boxes(): void {
+		add_meta_box(
+			'virtual_card_panels',
+			__( 'Card Panels', VCE_TEXT_DOMAIN ),
+			[ $this, 'render_meta_box' ],
+			Post_Type::POST_TYPE,
+			'normal',
+			'high'
+		);
+
+		add_meta_box(
+			'virtual_card_display_order',
+			__( 'Display order', VCE_TEXT_DOMAIN ),
+			[ $this, 'render_display_order_meta_box' ],
+			Post_Type::POST_TYPE,
+			'normal',
+			'default'
+		);
+	}
+
+	/**
+	 * Display order (integer meta) — separate box so the panels nonce stays single-use in the Card Panels UI.
+	 *
+	 * @param \WP_Post $post Post object.
+	 */
+	public function render_display_order_meta_box( $post ): void {
+		wp_nonce_field( 'vce_display_order_save', 'vce_display_order_nonce_field' );
+		$order = (int) get_post_meta( $post->ID, Panel_Meta::ORDER_META_KEY, true );
+		?>
+		<p>
+			<label for="vce_display_order"><?php esc_html_e( 'Order', VCE_TEXT_DOMAIN ); ?></label>
+			<input
+				type="number"
+				id="vce_display_order"
+				name="vce_display_order"
+				value="<?php echo esc_attr( (string) $order ); ?>"
+				min="0"
+				step="1"
+				class="small-text"
+			/>
+		</p>
+		<p class="description">
+			<?php esc_html_e( 'Optional sort key: lower numbers sort first where the theme or queries use this value. Leave 0 to clear custom ordering.', VCE_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
+	/**
+	 * Persist display order meta.
+	 *
+	 * @param int      $post_id Post ID.
+	 * @param \WP_Post $post    Post object.
+	 * @param bool     $update  Whether this is an update.
+	 */
+	public function save_display_order( int $post_id, $post, bool $update ): void { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable
+		if ( ! isset( $_POST['vce_display_order_nonce_field'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['vce_display_order_nonce_field'] ) ), 'vce_display_order_save' ) ) {
+			return;
+		}
+
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		$order = isset( $_POST['vce_display_order'] ) ? (int) $_POST['vce_display_order'] : 0;
+		if ( $order < 0 ) {
+			$order = 0;
+		}
+
+		if ( 0 === $order ) {
+			delete_post_meta( $post_id, Panel_Meta::ORDER_META_KEY );
+			return;
+		}
+
+		update_post_meta( $post_id, Panel_Meta::ORDER_META_KEY, $order );
+	}
+
+	/**
+	 * Enqueue admin CSS/JS on virtual card edit screens.
+	 *
+	 * @param string $hook_suffix Current admin page.
+	 */
+	public function enqueue_assets( string $hook_suffix ): void {
+		if ( ! in_array( $hook_suffix, [ 'post.php', 'post-new.php' ], true ) ) {
+			return;
+		}
+
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || Post_Type::POST_TYPE !== $screen->post_type ) {
+			return;
+		}
+
+		$post_id = 0;
+		if ( 'post.php' === $hook_suffix && isset( $_GET['post'] ) ) {
+			$post_id = (int) $_GET['post'];
+		}
+
+		wp_enqueue_media( [ 'post' => $post_id ] );
+
+		wp_enqueue_style(
+			'vce-admin-panel',
+			VCE_PLUGIN_URL . 'assets/css/admin-panel.css',
+			[],
+			vce_asset_version( 'assets/css/admin-panel.css' )
+		);
+
+		wp_enqueue_script(
+			'vce-admin-panel',
+			VCE_PLUGIN_URL . 'assets/js/admin-panel.js',
+			[ 'jquery', 'jquery-ui-sortable', 'media-editor' ],
+			vce_asset_version( 'assets/js/admin-panel.js' ),
+			true
+		);
+
+		wp_localize_script(
+			'vce-admin-panel',
+			'vceAdminPanel',
+			[
+				'frameTitle'       => __( 'Select images', VCE_TEXT_DOMAIN ),
+				'removeLabel'      => __( 'Remove image', VCE_TEXT_DOMAIN ),
+				'dragHandleLabel'  => __( 'Drag to reorder', VCE_TEXT_DOMAIN ),
+				'panelsCountEmpty' => __( 'No panels yet.', VCE_TEXT_DOMAIN ),
+				'panelsCountOne'   => __( '1 panel', VCE_TEXT_DOMAIN ),
+				/* translators: %d: number of panels */
+				'panelsCountMany'  => __( '%d panels', VCE_TEXT_DOMAIN ),
+				/* translators: 1: current panel index, 2: total panels */
+				'panelOfMany'      => __( 'Panel %1$s of %2$s', VCE_TEXT_DOMAIN ),
+				'fullPreview'      => __( 'Full preview', VCE_TEXT_DOMAIN ),
+				'closeModal'       => __( 'Close', VCE_TEXT_DOMAIN ),
+				'modalAriaLabel'   => __( 'Panel preview', VCE_TEXT_DOMAIN ),
+			]
+		);
+	}
+
+	/**
+	 * Render meta box HTML via template.
+	 *
+	 * @param \WP_Post $post Post object.
+	 */
+	public function render_meta_box( $post ): void {
+		$ids = get_post_meta( $post->ID, Panel_Meta::META_KEY, true );
+		$ids = is_array( $ids ) ? $ids : [];
+
+		Template::render(
+			'admin/panel-meta-box.php',
+			[
+				'post' => $post,
+				'ids'  => $ids,
+			]
+		);
+	}
+
+	/**
+	 * Persist panel attachment IDs.
+	 *
+	 * @param int      $post_id Post ID.
+	 * @param \WP_Post $post    Post object.
+	 * @param bool     $update  Whether this is an update.
+	 */
+	public function save_panels( int $post_id, $post, bool $update ): void { // phpcs:ignore VariableAnalysis.CodeAnalysis.VariableAnalysis.UnusedVariable
+		if ( ! isset( $_POST[ self::NONCE_FIELD ] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ self::NONCE_FIELD ] ) ), self::NONCE_ACTION ) ) {
+			return;
+		}
+
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		if ( ! empty( $_POST[ self::IDS_FIELD ] ) ) {
+			$raw = sanitize_text_field( wp_unslash( $_POST[ self::IDS_FIELD ] ) );
+			$ids = array_map( 'intval', array_filter( explode( ',', $raw ) ) );
+			update_post_meta( $post_id, Panel_Meta::META_KEY, $ids );
+			return;
+		}
+
+		delete_post_meta( $post_id, Panel_Meta::META_KEY );
+	}
+
+    public function add_virtual_card_image_column(array $columns): array
+    {
+        $new_columns = [];
+        foreach ($columns as $key => $label) {
+            if ($key === 'title') {
+                $new_columns['ads_card_image'] = __('Image', 'accurate-digital-stripe-subscriptions');
+            }
+            $new_columns[$key] = $label;
+        }
+
+        if (! isset($new_columns['ads_card_image'])) {
+            $new_columns = ['ads_card_image' => __('Image', 'accurate-digital-stripe-subscriptions')] + $new_columns;
+        }
+
+        return $new_columns;
+    }
+
+    public function render_virtual_card_image_column(string $column, int $post_id): void
+    {
+        if ($column !== 'ads_card_image') {
+            return;
+        }
+
+        if (has_post_thumbnail($post_id)) {
+            echo get_the_post_thumbnail($post_id, [50, 50], ['style' => 'width:50px;height:50px;object-fit:cover;border-radius:4px;']);
+            return;
+        }
+
+        echo '&mdash;';
+    }
+}

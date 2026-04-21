@@ -1,0 +1,20 @@
+/**
+ * Virtual Card Elementor — frontend Card Panels (Elementor widget)
+ */
+
+.virtual-card-panels.vce-card-panels,
+.vce-card-panels {
+	display: grid;
+	grid-template-columns: repeat(var(--vce-columns, 3), 1fr);
+}
+
+.vce-card-panels__item {
+	min-width: 0;
+}
+
+.vce-card-panels__image {
+	width: 100%;
+	height: auto;
+	display: block;
+	vertical-align: middle;
+}
