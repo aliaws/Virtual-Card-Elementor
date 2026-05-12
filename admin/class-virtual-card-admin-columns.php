@@ -26,7 +26,9 @@ class Virtual_Card_Admin_Columns {
 		add_filter( 'manage_' . Post_Type::POST_TYPE . '_posts_columns', [ $this, 'add_columns' ] );
 		add_action( 'manage_' . Post_Type::POST_TYPE . '_posts_custom_column', [ $this, 'render_column' ], 10, 2 );
 		add_action( 'restrict_manage_posts', [ $this, 'render_category_dropdown' ] );
+		add_action( 'restrict_manage_posts', [ $this, 'render_favorite_dropdown' ] );
 		add_action( 'parse_query', [ $this, 'filter_by_selected_category' ] );
+		add_action( 'parse_query', [ $this, 'filter_by_favorite' ] );
 	}
 
 	/**
@@ -42,6 +44,7 @@ class Virtual_Card_Admin_Columns {
 			if ( 'title' === $key ) {
 				$new['vce_panels'] = __( 'No. of panels', VCE_TEXT_DOMAIN );
 				$new['wix_id']   = __( 'WIX ID', VCE_TEXT_DOMAIN );
+				$new['vce_favorite'] = __( 'Favorite', VCE_TEXT_DOMAIN );
 			}
 
 		}
@@ -146,6 +149,62 @@ class Virtual_Card_Admin_Columns {
 			return;
 		}
 
+		if ( 'vce_favorite' === $column_name ) {
+			$is_favorite = get_post_meta( $post_id, Panel_Meta::IS_FAVORITE_META_KEY, true );
+			if ( '1' === $is_favorite ) {
+				echo '<span class="dashicons dashicons-star-filled" style="color:#f0ad4e;"></span>';
+			} else {
+				echo '—';
+			}
+			return;
+		}
+
+	}
+
+	public function render_favorite_dropdown(): void {
+		global $typenow;
+		if ( Post_Type::POST_TYPE !== $typenow ) {
+			return;
+		}
+		$selected = isset( $_GET['vce_favorite_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['vce_favorite_filter'] ) ) : '';
+		?>
+		<select name="vce_favorite_filter">
+			<option value="" <?php selected( $selected, '' ); ?>><?php esc_html_e( 'All', VCE_TEXT_DOMAIN ); ?></option>
+			<option value="yes" <?php selected( $selected, 'yes' ); ?>><?php esc_html_e( 'Favorites', VCE_TEXT_DOMAIN ); ?></option>
+			<option value="no" <?php selected( $selected, 'no' ); ?>><?php esc_html_e( 'Not Favorites', VCE_TEXT_DOMAIN ); ?></option>
+		</select>
+		<?php
+	}
+
+	public function filter_by_favorite( $query ): void {
+		if ( ! is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+		if ( Post_Type::POST_TYPE !== $query->get( 'post_type' ) ) {
+			return;
+		}
+		$filter = isset( $_GET['vce_favorite_filter'] ) ? sanitize_text_field( wp_unslash( $_GET['vce_favorite_filter'] ) ) : '';
+		if ( empty( $filter ) ) {
+			return;
+		}
+		$meta_query = $query->get( 'meta_query' ) ?: [];
+		if ( ! is_array( $meta_query ) ) {
+			$meta_query = [];
+		}
+		if ( 'yes' === $filter ) {
+			$meta_query[] = [
+				'key'   => Panel_Meta::IS_FAVORITE_META_KEY,
+				'value' => '1',
+			];
+		} elseif ( 'no' === $filter ) {
+			$meta_query[] = [
+				'key'     => Panel_Meta::IS_FAVORITE_META_KEY,
+				'compare' => 'NOT EXISTS',
+			];
+		}
+		if ( ! empty( $meta_query ) ) {
+			$query->set( 'meta_query', $meta_query );
+		}
 	}
 
 }
