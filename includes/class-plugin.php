@@ -8,6 +8,7 @@
 namespace Virtual_Card_Elementor;
 
 use Virtual_Card_Elementor\Admin\Attachment_Tags;
+use Virtual_Card_Elementor\Admin\Card_Labels_Meta_Box;
 use Virtual_Card_Elementor\Admin\Card_Submission_Admin;
 use Virtual_Card_Elementor\Admin\Panel_Meta_Box;
 use Virtual_Card_Elementor\Admin\Virtual_Card_Admin_Columns;
@@ -85,6 +86,9 @@ class Plugin {
 
 		$panels = new Panel_Meta_Box();
 		$panels->register_hooks();
+
+		$card_labels = new Card_Labels_Meta_Box();
+		$card_labels->register_hooks();
 
 		$list_columns = new Virtual_Card_Admin_Columns();
 		$list_columns->register_hooks();

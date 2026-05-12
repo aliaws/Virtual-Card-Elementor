@@ -27,4 +27,19 @@ class Panel_Meta {
 	 */
 	public const ORDER_META_KEY = 'order';
 
+	/**
+	 * Is Favorite (checkbox).
+	 */
+	public const IS_FAVORITE_META_KEY = '_vce_is_favorite';
+
+	/**
+	 * First Level Label (text).
+	 */
+	public const FIRST_LEVEL_LABEL_META_KEY = '_vce_first_level_label';
+
+	/**
+	 * Second Level Label (text).
+	 */
+	public const SECOND_LEVEL_LABEL_META_KEY = '_vce_second_level_label';
+
 }
