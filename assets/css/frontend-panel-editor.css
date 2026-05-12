@@ -749,3 +749,33 @@
 		display: none;
 	}
 }
+
+.vce-email-form {
+	background: var(--vce-editor-surface);
+	border: 1px solid var(--vce-editor-border);
+	border-radius: var(--vce-editor-radius);
+	padding: 16px;
+	margin: 12px 0;
+}
+
+.vce-email-form__field {
+	margin: 0 0 12px;
+}
+
+.vce-email-form__field label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 4px;
+	font-size: 13px;
+}
+
+.vce-email-form__actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.vce-email-form__status {
+	margin: 8px 0 0;
+	font-size: 13px;
+}

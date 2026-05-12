@@ -177,6 +177,27 @@ Use the widget on templates where the main queried post is the desired **`virtua
 - **[Tagify](https://github.com/yairEO/tagify)** provides the tag UI; typing triggers debounced **`admin-ajax.php?action=vce_suggest_attachment_tags`** (nonce + `upload_files` capability) to suggest existing tags. Suggestions are built from other attachments’ meta and cached in a short-lived transient.
 - Scripts: **`assets/js/admin-attachment-tags.js`** (patches `wp.media.view.Attachment.Details` / `TwoColumn` so Tagify initializes after each render). Styles: **`assets/css/admin-attachment-tags.css`**.
 
+**Card Labels meta box (`Card_Labels_Meta_Box`)**
+
+- Adds **"Labels & Status"** meta box on Virtual Card edit screen.
+- Fields: **Is Favorite** (checkbox), **First Level Label** (text), **Second Level Label** (text).
+- Saves to post meta: `_vce_is_favorite`, `_vce_first_level_label`, `_vce_second_level_label`.
+
+**Admin: Favorite filter for Virtual Cards (`Virtual_Card_Admin_Columns`)**
+
+- Adds **"Favorite"** column with star icon in Virtual Cards admin list.
+- Filter dropdown: All Cards / Favorites / Not Favorites.
+- Query filters by **`_vce_is_favorite`** meta key.
+
+**Profile hooks for UM/WooCommerce integration (`Profile_Hooks`)**
+
+- `woocommerce_account_menu_items`: Removes "edit-account", adds "Account Details" menu item.
+- `woocommerce_get_endpoint_url`: Points Account Details to UM profile page (`/account-details/`).
+- `um_profile_permalink`: Changes UM profile link to WooCommerce my-account (`/my-account/`).
+- `um_get_option_filter__account_tab_privacy`: Disables Privacy tab in UM account page.
+
+**Flow**: WooCommerce my-account "Account Details" → UM account page → "View Profile" link → WooCommerce my-account.
+
 ## REST API (plugin)
 
 | Route | Method | Role |
@@ -191,14 +212,17 @@ Use the widget on templates where the main queried post is the desired **`virtua
 | `virtual-card-elementor.php` | Bootstrap, constants, helpers, activation hook |
 | `includes/class-plugin.php` | Hooks orchestration, Elementor asset registration, submission `the_content` append |
 | `includes/class-post-type.php` | CPT + taxonomy registration, classic editor for submissions |
-| `includes/class-panel-meta.php` | Meta key constants (panels, submission layers, Wix id, order) |
+| `includes/class-panel-meta.php` | Meta key constants (panels, submission layers, Wix id, order, labels) |
 | `includes/class-editor-access.php` | Who may use the front-end editor (`logged_in` vs `guest` filters) |
 | `includes/class-debug-log.php` | Diagnostic logging + debug client asset registration |
 | `includes/class-vce-debug-rest.php` | REST **`vce/v1/debug-client`** |
 | `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** |
 | `includes/class-template.php` | Template loader |
+| `includes/class-profile-hooks.php` | WooCommerce & UM profile integration hooks |
+| `includes/class-um-hooks.php` | Logout redirect, UM/ECard filtering hooks |
 | `admin/class-panel-meta-box.php` | Card Panels + display order meta boxes, save handlers |
-| `admin/class-virtual-card-admin-columns.php` | Virtual Cards list: panels count, WIX ID, category filter |
+| `admin/class-card-labels-meta-box.php` | Labels & Status meta box (Favorite, First/Second Level Labels) |
+| `admin/class-virtual-card-admin-columns.php` | Virtual Cards list: panels count, WIX ID, category filter, favorite filter |
 | `admin/class-card-submission-admin.php` | Submissions list, final view link, parent filter/meta box |
 | `admin/class-attachment-tags.php` | Attachment Tags field + AJAX + Tagify enqueue |
 | `admin/class-vce-debug-page.php` | **Tools → VCE debug** admin page |

@@ -90,6 +90,18 @@
 	function init(root) {
 		var panels = parseJsonAttr(root, 'data-panels', []);
 		var layers = parseJsonAttr(root, 'data-layers', {});
+		var postId = root.getAttribute('data-post-id') || '';
+		var restUrl = root.getAttribute('data-rest-url') || '';
+
+		// Track view
+		if (postId && restUrl) {
+			fetch(restUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ submissionId: parseInt(postId, 10) }),
+			}).catch(function(){});
+		}
+
 		if (!Array.isArray(panels) || !panels.length) {
 			return;
 		}
