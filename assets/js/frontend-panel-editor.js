@@ -930,16 +930,8 @@
 					if (!result.ok || !result.data) {
 						throw new Error('save_failed');
 					}
-					var openUrl = result.data.preview_url || result.data.url || '';
-					if (!openUrl) {
-						throw new Error('save_failed');
-					}
-					var msg = i18n.submissionSaved || 'Submission saved. Opening preview...';
-					setSubmissionLink(msg, openUrl);
-					var popup = window.open(openUrl, '_blank');
-					if (!popup) {
-						window.location.href = openUrl;
-					}
+					var msg = i18n.submissionSaved || 'Submission saved successfully!';
+					setSubmissionLink(msg, '');
 				})
 				.catch(function () {
 					setSubmissionLink(i18n.submissionFailed || 'Could not save submission.', '');
@@ -1067,13 +1059,6 @@
 					}
 					var msg = i18n.emailSent || 'Card sent successfully!';
 					setEmailStatus(msg);
-					var openUrl = result.submission.preview_url || result.submission.url || '';
-					if (openUrl) {
-						var popup = window.open(openUrl, '_blank');
-						if (!popup) {
-							window.location.href = openUrl;
-						}
-					}
 				})
 				.catch(function () {
 					setEmailStatus(i18n.emailFailed || 'Could not send card.', true);
