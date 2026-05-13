@@ -21,7 +21,23 @@ final class User_Account {
 	 */
 	public function register_hooks(): void {
 		add_shortcode( 'user_account_menu', [ $this, 'render_shortcode' ] );
+		add_shortcode( 'vce_dynamic_title', [ $this, 'vce_dynamic_post_title' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+	}
+
+	/**
+	 * Dynamic post title shortcode – falls back to post title if meta empty.
+	 *
+	 * @return string
+	 */
+	public function vce_dynamic_post_title(): string {
+		$custom_title = get_post_meta( get_the_ID(), Panel_Meta::SECOND_LEVEL_LABEL_META_KEY, true );
+
+		if ( ! empty( $custom_title ) ) {
+			return esc_html( $custom_title );
+		}
+
+		return get_the_title();
 	}
 
 	/**
