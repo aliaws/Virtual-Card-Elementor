@@ -64,6 +64,8 @@ final class Card_Submission_Rest {
 			$decoded = [];
 		}
 
+		$user_id = get_current_user_id();
+
 		$post_id = wp_insert_post(
 			[
 				'post_type'   => Post_Type::CARD_SUBMISSION_POST_TYPE,
@@ -71,9 +73,9 @@ final class Card_Submission_Rest {
 				'post_parent' => $parent_id,
 				'post_name'   => sanitize_title( 'submission-' . wp_date( 'Y-m-d-His' ) . '-' . wp_generate_password( 4, false, false ) ),
 				'post_title'  => sprintf(
-					/* translators: %s date/time string */
-					__( 'Submission %s', VCE_TEXT_DOMAIN ),
-					wp_date( 'Y-m-d H:i' )
+					'(VC - %d, Sender - %d)',
+					$parent_id,
+					$user_id ?: 0
 				),
 			],
 			true
@@ -84,6 +86,23 @@ final class Card_Submission_Rest {
 		}
 
 		update_post_meta( $post_id, Panel_Meta::SUBMISSION_LAYERS_META_KEY, $decoded );
+		update_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, 'saved' );
+
+		if ( $user_id ) {
+			update_post_meta( $post_id, Panel_Meta::SUBMISSION_SENDER_ID, $user_id );
+		}
+
+		$parent_title = get_the_title( $parent_id );
+		Submission_Logger::log(
+			$post_id,
+			'created',
+			sprintf(
+				'Virtual Card: %s (#%d), Sender: %s (#%d)',
+				$parent_title ?: '#', (string) $parent_id,
+				$user_id ? ( get_userdata( $user_id )->display_name ?: 'User' ) : 'Guest',
+				$user_id ?: 0
+			)
+		);
 
 		$preview_url = add_query_arg(
 			[

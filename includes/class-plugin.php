@@ -104,6 +104,15 @@ class Plugin {
 		$profile_hooks = new Profile_Hooks();
 		$profile_hooks->register_hooks();
 
+		$card_email = new Card_Email_Rest();
+		$card_email->register_hooks();
+
+		$card_view = new Card_View_Rest();
+		$card_view->register_hooks();
+
+		$submission_meta = new Admin\Card_Submission_Meta_Box();
+		$submission_meta->register_hooks();
+
 		add_action( 'elementor/widgets/register', [ $this, 'register_elementor_widget' ] );
 		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_elementor_frontend_assets' ] );
 		add_filter( 'the_content', [ $this, 'append_submission_final_view' ] );
@@ -293,6 +302,7 @@ class Plugin {
 			[
 				'panels_data'  => $panels_data,
 				'saved_layers' => $saved_layers,
+				'post_id'      => $post->ID,
 			]
 		);
 		return $content . (string) ob_get_clean();

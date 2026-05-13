@@ -140,6 +140,7 @@
 		var cfg = typeof vcePanelEditor !== 'undefined' ? vcePanelEditor : {};
 		var i18n = cfg.i18n || {};
 		var submissionApi = cfg.submissionApi || {};
+		var emailApi = cfg.emailApi || {};
 
 		if (cfg.vceDiag && typeof console !== 'undefined' && console.info) {
 			console.info('[VCE panel editor]', cfg.vceDiag);
@@ -155,6 +156,14 @@
 		var btnReview = root.querySelector('[data-vce-final-review]');
 		var btnDel = root.querySelector('[data-vce-delete-layer]');
 		var btnSaveSubmission = root.querySelector('[data-vce-save-submission]');
+		var btnSaveSend = root.querySelector('[data-vce-save-send]');
+		var emailForm = root.querySelector('[data-vce-email-form]');
+		var recipientInput = root.querySelector('[data-vce-recipient-email]');
+		var senderInput = root.querySelector('[data-vce-sender-name]');
+		var messageInput = root.querySelector('[data-vce-send-message]');
+		var sendBtn = root.querySelector('[data-vce-send-email]');
+		var cancelBtn = root.querySelector('[data-vce-cancel-email]');
+		var emailStatus = root.querySelector('[data-vce-email-status]');
 		var submissionLink = root.querySelector('[data-vce-submission-link]');
 		var inputSize = root.querySelector('[data-vce-font-size]');
 		var inputColor = root.querySelector('[data-vce-text-color]');
@@ -921,16 +930,8 @@
 					if (!result.ok || !result.data) {
 						throw new Error('save_failed');
 					}
-					var openUrl = result.data.preview_url || result.data.url || '';
-					if (!openUrl) {
-						throw new Error('save_failed');
-					}
-					var msg = i18n.submissionSaved || 'Submission saved. Opening preview...';
-					setSubmissionLink(msg, openUrl);
-					var popup = window.open(openUrl, '_blank');
-					if (!popup) {
-						window.location.href = openUrl;
-					}
+					var msg = i18n.submissionSaved || 'Submission saved successfully!';
+					setSubmissionLink(msg, '');
 				})
 				.catch(function () {
 					setSubmissionLink(i18n.submissionFailed || 'Could not save submission.', '');
@@ -938,6 +939,133 @@
 				.finally(function () {
 					btnSaveSubmission.disabled = false;
 					btnSaveSubmission.textContent = i18n.saveSubmission || 'Save submission';
+				});
+		}
+
+		function showEmailForm() {
+			if (emailForm) {
+				emailForm.removeAttribute('hidden');
+			}
+			if (recipientInput) {
+				recipientInput.focus();
+			}
+		}
+
+		function hideEmailForm() {
+			if (emailForm) {
+				emailForm.setAttribute('hidden', 'hidden');
+			}
+			if (recipientInput) {
+				recipientInput.value = '';
+			}
+			if (senderInput) {
+				senderInput.value = '';
+			}
+			if (messageInput) {
+				messageInput.value = '';
+			}
+			if (emailStatus) {
+				emailStatus.setAttribute('hidden', 'hidden');
+			}
+		}
+
+		function setEmailStatus(msg, isError) {
+			if (!emailStatus) {
+				return;
+			}
+			emailStatus.textContent = msg || '';
+			emailStatus.style.color = isError ? '#d63638' : '#00a32a';
+			emailStatus.removeAttribute('hidden');
+		}
+
+		function saveAndSend() {
+			if (!recipientInput || !recipientInput.value.trim()) {
+				setEmailStatus(i18n.recipientRequired || 'Please enter a recipient email.', true);
+				return;
+			}
+
+			saveCurrentPanelObjects();
+			sendBtn.disabled = true;
+			sendBtn.textContent = i18n.savingSubmission || 'Saving...';
+			setEmailStatus('');
+
+			var headers = { 'Content-Type': 'application/json' };
+			if (submissionApi.nonce) {
+				headers['X-WP-Nonce'] = submissionApi.nonce;
+			}
+
+			fetch(submissionApi.endpoint, {
+				method: 'POST',
+				headers: headers,
+				credentials: 'same-origin',
+				body: JSON.stringify({
+					parentId: parseInt(root.getAttribute('data-source-card-id') || postId || '0', 10) || 0,
+					layers: layersByPanel,
+				}),
+			})
+				.then(function (res) {
+					return res.json().then(function (data) {
+						return { ok: res.ok, data: data };
+					});
+				})
+				.then(function (result) {
+					if (!result.ok || !result.data) {
+						throw new Error('save_failed');
+					}
+
+					setEmailStatus(i18n.preparingPreview || 'Building preview...');
+
+					return new Promise(function (resolve) {
+						if (window.vcePanelRenderer && typeof window.vcePanelRenderer.buildPreviewUrls === 'function') {
+							window.vcePanelRenderer.buildPreviewUrls(panels, layersByPanel, 600, 800, function (previewUrls) {
+								resolve({ submission: result.data, previewUrls: previewUrls || [] });
+							});
+						} else {
+							resolve({ submission: result.data, previewUrls: [] });
+						}
+					});
+				})
+				.then(function (data) {
+					setEmailStatus(i18n.sendingEmail || 'Sending...');
+
+					var emailHeaders = { 'Content-Type': 'application/json' };
+					if (submissionApi.nonce) {
+						emailHeaders['X-WP-Nonce'] = submissionApi.nonce;
+					}
+
+					return fetch(emailApi.endpoint, {
+						method: 'POST',
+						headers: emailHeaders,
+						credentials: 'same-origin',
+						body: JSON.stringify({
+							submissionId: data.submission.id,
+							recipientEmail: recipientInput.value.trim(),
+							senderName: senderInput ? senderInput.value.trim() : '',
+							message: messageInput ? messageInput.value.trim() : '',
+							cardTitle: document.title || 'Virtual Card',
+							panels: data.previewUrls.map(function (url) {
+								return { url: url, w: 0, h: 0 };
+							}),
+						}),
+					}).then(function (res) {
+						return res.json().then(function (body) {
+							return { ok: res.ok, body: body, submission: data.submission };
+						});
+					});
+				})
+				.then(function (result) {
+					if (!result.ok) {
+						throw new Error('email_failed');
+					}
+					var msg = i18n.emailSent || 'Card sent successfully!';
+					setEmailStatus(msg);
+				})
+				.catch(function () {
+					setEmailStatus(i18n.emailFailed || 'Could not send card.', true);
+				})
+				.finally(function () {
+					sendBtn.disabled = false;
+					sendBtn.textContent = i18n.sendEmail || 'Send';
 				});
 		}
 
@@ -960,6 +1088,18 @@
 		}
 		if (btnSaveSubmission) {
 			btnSaveSubmission.addEventListener('click', saveSubmission);
+		}
+		if (btnSaveSend) {
+			btnSaveSend.addEventListener('click', function () {
+				saveCurrentPanelObjects();
+				showEmailForm();
+			});
+		}
+		if (sendBtn) {
+			sendBtn.addEventListener('click', saveAndSend);
+		}
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', hideEmailForm);
 		}
 		if (inputSize) {
 			inputSize.addEventListener('input', function () {

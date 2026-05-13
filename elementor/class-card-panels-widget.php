@@ -331,6 +331,9 @@ class Card_Panels_Widget extends Widget_Base {
 					'endpoint' => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
 					'nonce'    => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
 				],
+				'emailApi' => [
+					'endpoint' => esc_url_raw( rest_url( 'vce/v1/send-email' ) ),
+				],
 				'i18n'         => [
 					'defaultText'         => __( 'Your text', VCE_TEXT_DOMAIN ),
 					'finalReview'         => __( 'Final review', VCE_TEXT_DOMAIN ),
@@ -347,6 +350,12 @@ class Card_Panels_Widget extends Widget_Base {
 						'You have text on this card that is only saved in this browser. Leave anyway?',
 						VCE_TEXT_DOMAIN
 					),
+					'sendEmail'           => __( 'Send', VCE_TEXT_DOMAIN ),
+					'emailSent'           => __( 'Card sent successfully!', VCE_TEXT_DOMAIN ),
+					'emailFailed'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
+					'recipientRequired'   => __( 'Please enter a recipient email.', VCE_TEXT_DOMAIN ),
+					'preparingPreview'    => __( 'Building preview...', VCE_TEXT_DOMAIN ),
+					'sendingEmail'        => __( 'Sending...', VCE_TEXT_DOMAIN ),
 				],
 			];
 			if ( \Virtual_Card_Elementor\Debug_Log::vce_debug_client_enabled() ) {
@@ -383,6 +392,7 @@ class Card_Panels_Widget extends Widget_Base {
 					'columns'      => $columns,
 					'panels_data'  => $panels_data,
 					'saved_layers' => $saved_layers,
+					'post_id'      => $post->ID,
 				]
 			);
 			return;

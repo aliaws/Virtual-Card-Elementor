@@ -53,6 +53,9 @@ if ( false === $saved_json ) {
 					<button type="button" class="button button-secondary vce-panel-editor__btn" data-vce-save-submission>
 						<?php esc_html_e( 'Save submission', VCE_TEXT_DOMAIN ); ?>
 					</button>
+					<button type="button" class="button button-secondary vce-panel-editor__btn" data-vce-save-send>
+						<?php esc_html_e( 'Save & Send', VCE_TEXT_DOMAIN ); ?>
+					</button>
 				</div>
 				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--danger" data-vce-delete-layer disabled>
 					<?php esc_html_e( 'Remove text', VCE_TEXT_DOMAIN ); ?>
@@ -182,6 +185,28 @@ if ( false === $saved_json ) {
 			<span class="vce-panel-editor__panel-label" data-vce-panel-label></span>
 			<span class="vce-panel-editor__draft-note"><?php esc_html_e( 'Draft saved in this browser only.', VCE_TEXT_DOMAIN ); ?></span>
 			<a class="vce-panel-editor__submission-link" data-vce-submission-link hidden></a>
+		</div>
+	</div>
+
+	<div class="vce-email-form" data-vce-email-form hidden>
+		<div class="vce-email-form__inner">
+			<p class="vce-email-form__field">
+				<label for="vce-recipient-email"><?php esc_html_e( 'Recipient Email', VCE_TEXT_DOMAIN ); ?> *</label>
+				<input type="email" id="vce-recipient-email" data-vce-recipient-email class="widefat" required />
+			</p>
+			<p class="vce-email-form__field">
+				<label for="vce-sender-name"><?php esc_html_e( 'Your Name', VCE_TEXT_DOMAIN ); ?></label>
+				<input type="text" id="vce-sender-name" data-vce-sender-name class="widefat" />
+			</p>
+			<p class="vce-email-form__field">
+				<label for="vce-send-message"><?php esc_html_e( 'Message', VCE_TEXT_DOMAIN ); ?></label>
+				<textarea id="vce-send-message" data-vce-send-message class="widefat" rows="3"></textarea>
+			</p>
+			<div class="vce-email-form__actions">
+				<button type="button" class="button button-primary" data-vce-send-email><?php esc_html_e( 'Send', VCE_TEXT_DOMAIN ); ?></button>
+				<button type="button" class="button" data-vce-cancel-email><?php esc_html_e( 'Cancel', VCE_TEXT_DOMAIN ); ?></button>
+			</div>
+			<p class="vce-email-form__status" data-vce-email-status hidden></p>
 		</div>
 	</div>
 
