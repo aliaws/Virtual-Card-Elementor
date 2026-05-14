@@ -134,7 +134,7 @@ class Profile_Hooks {
 		}
         else if ( 'edit_profile_picture' === $endpoint ) {
             $user_id = get_current_user_id();
-            return $this->get_um_profile_url_custom($user_id);
+            return $this->get_um_profile_url_custom($user_id)."?um_action=edit";
         }
 		return $url;
 	}
