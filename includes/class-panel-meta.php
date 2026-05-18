@@ -28,6 +28,11 @@ class Panel_Meta {
 	public const ORDER_META_KEY = 'order';
 
 	/**
+	 * Elementor Posts / Loop "Order By" value for {@see Panel_Meta::ORDER_META_KEY}.
+	 */
+	public const ORDERBY_DISPLAY_ORDER = 'vce_display_order';
+
+	/**
 	 * Is Favorite (checkbox).
 	 */
 	public const IS_FAVORITE_META_KEY = '_vce_is_favorite';
