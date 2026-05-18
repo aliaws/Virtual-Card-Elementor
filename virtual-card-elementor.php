@@ -52,6 +52,7 @@ require_once VCE_PLUGIN_DIR . 'includes/class-editor-access.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-post-type.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-panel-meta-box.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-card-labels-meta-box.php';
+require_once VCE_PLUGIN_DIR . 'admin/class-virtual-card-gallery-page.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-email-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-view-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-submission-logger.php';
