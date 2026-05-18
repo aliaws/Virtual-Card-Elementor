@@ -4,8 +4,9 @@
  *
  * @package Virtual_Card_Elementor
  *
- * @var array $panels_data
- * @var array $saved_layers
+ * @var array  $panels_data
+ * @var array  $saved_layers
+ * @var int    $post_id
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -18,12 +19,16 @@ $layers_json = wp_json_encode( $saved_layers, JSON_HEX_TAG | JSON_HEX_AMP | JSON
 if ( false === $layers_json ) {
 	$layers_json = '{}';
 }
+$submission_id = ! empty( $post_id ) ? (int) $post_id : ( get_the_ID() ?: 0 );
+$rest_url      = function_exists( 'rest_url' ) ? rest_url( 'vce/v1/track-view' ) : '';
 ?>
 <div
 	class="vce-submission-viewer"
 	data-vce-submission-panels
 	data-panels="<?php echo esc_attr( $panels_json ); ?>"
 	data-layers="<?php echo esc_attr( $layers_json ); ?>"
+	data-post-id="<?php echo esc_attr( (string) $submission_id ); ?>"
+	data-rest-url="<?php echo esc_url( $rest_url ); ?>"
 >
 	<div class="vce-preview-modal vce-preview-modal--fullpage" data-vce-submission-modal>
 		<div class="vce-preview-modal__backdrop" data-vce-submission-close tabindex="-1"></div>

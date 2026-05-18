@@ -8,6 +8,7 @@
 namespace Virtual_Card_Elementor;
 
 use Virtual_Card_Elementor\Admin\Attachment_Tags;
+use Virtual_Card_Elementor\Admin\Card_Labels_Meta_Box;
 use Virtual_Card_Elementor\Admin\Card_Submission_Admin;
 use Virtual_Card_Elementor\Admin\Panel_Meta_Box;
 use Virtual_Card_Elementor\Admin\Virtual_Card_Admin_Columns;
@@ -26,6 +27,7 @@ require_once VCE_PLUGIN_DIR . 'includes/class-vce-debug-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-submission-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-user-account.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-um-hooks.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-profile-hooks.php';
 
 /**
  * Loads components and hooks.
@@ -85,6 +87,9 @@ class Plugin {
 		$panels = new Panel_Meta_Box();
 		$panels->register_hooks();
 
+		$card_labels = new Card_Labels_Meta_Box();
+		$card_labels->register_hooks();
+
 		$list_columns = new Virtual_Card_Admin_Columns();
 		$list_columns->register_hooks();
 
@@ -95,6 +100,18 @@ class Plugin {
 		$user_account->register_hooks();
 		$um_hooks = new Um_Hooks();
 		$um_hooks->register_hooks();
+
+		$profile_hooks = new Profile_Hooks();
+		$profile_hooks->register_hooks();
+
+		$card_email = new Card_Email_Rest();
+		$card_email->register_hooks();
+
+		$card_view = new Card_View_Rest();
+		$card_view->register_hooks();
+
+		$submission_meta = new Admin\Card_Submission_Meta_Box();
+		$submission_meta->register_hooks();
 
 		add_action( 'elementor/widgets/register', [ $this, 'register_elementor_widget' ] );
 		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_elementor_frontend_assets' ] );
@@ -285,6 +302,7 @@ class Plugin {
 			[
 				'panels_data'  => $panels_data,
 				'saved_layers' => $saved_layers,
+				'post_id'      => $post->ID,
 			]
 		);
 		return $content . (string) ob_get_clean();

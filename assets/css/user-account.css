@@ -223,3 +223,11 @@
 		height: 18px;
 	}
 }
+
+.um.um-profile .um-header {
+	border-bottom: none;
+}
+.um.um-profile .um-profile-navbar,
+.um.um-profile .um-profile-body {
+	display: none;
+}

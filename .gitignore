@@ -1,0 +1,12 @@
+vendor
+logs/*
+node_modules
+package-lock.json
+#package.json
+test.*
+composer.json
+composer.lock
+virtual-card-elementor.zip
+.idea/*
+download_images.py
+tmp/*

@@ -7,6 +7,7 @@
 
 namespace Virtual_Card_Elementor\Admin;
 
+use Virtual_Card_Elementor\Panel_Meta;
 use Virtual_Card_Elementor\Post_Type;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -29,6 +30,8 @@ class Card_Submission_Admin {
 		add_action( 'add_meta_boxes', [ $this, 'add_parent_meta_box' ] );
 		add_action( 'save_post', [ $this, 'save_parent_meta_box' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_parent_picker_script' ] );
+		add_filter( 'post_row_actions', [ $this, 'add_send_row_action' ], 10, 2 );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_send_script' ] );
 	}
 
 	/**
@@ -314,6 +317,92 @@ JS;
 			]
 		);
 		add_action( 'save_post', [ $this, 'save_parent_meta_box' ], 10, 2 );
+	}
+
+	public function add_send_row_action( $actions, $post ) {
+		if ( Post_Type::CARD_SUBMISSION_POST_TYPE !== $post->post_type ) {
+			return $actions;
+		}
+		$status = get_post_meta( $post->ID, Panel_Meta::SUBMISSION_STATUS, true );
+		if ( 'saved' !== $status ) {
+			return $actions;
+		}
+		$actions['send'] = sprintf(
+			'<a href="#" class="vce-admin-send" data-post-id="%d">%s</a>',
+			(int) $post->ID,
+			esc_html__( 'Send', VCE_TEXT_DOMAIN )
+		);
+		return $actions;
+	}
+
+	public function enqueue_admin_send_script( $hook_suffix ): void {
+		if ( 'edit.php' !== $hook_suffix ) {
+			return;
+		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || Post_Type::CARD_SUBMISSION_POST_TYPE !== $screen->post_type ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'vce-admin-card-send',
+			VCE_PLUGIN_URL . 'assets/js/admin-card-send.js',
+			[ 'jquery' ],
+			vce_asset_version( 'assets/js/admin-card-send.js' ),
+			true
+		);
+
+		wp_localize_script(
+			'vce-admin-card-send',
+			'vceAdminSend',
+			[
+				'restUrl' => esc_url_raw( rest_url( 'vce/v1/admin-send-email' ) ),
+				'nonce'   => wp_create_nonce( 'wp_rest' ),
+				'i18n'    => [
+					'send'          => __( 'Send', VCE_TEXT_DOMAIN ),
+					'sending'       => __( 'Sending...', VCE_TEXT_DOMAIN ),
+					'sent'          => __( 'Card sent!', VCE_TEXT_DOMAIN ),
+					'failed'        => __( 'Failed to send.', VCE_TEXT_DOMAIN ),
+					'error'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
+					'requiredEmail' => __( 'Please enter recipient email.', VCE_TEXT_DOMAIN ),
+				],
+			]
+		);
+		?>
+		<style>
+		.vce-send-modal { display:none; position:fixed; z-index:100000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); }
+		.vce-send-modal.open { display:block; }
+		.vce-send-modal-content { background:#fff; margin:10% auto; max-width:450px; padding:24px; border-radius:8px; box-shadow:0 5px 30px rgba(0,0,0,0.3); }
+		.vce-send-modal-content h3 { margin:0 0 16px; }
+		.vce-send-modal-content label { display:block; font-weight:600; margin-bottom:4px; }
+		.vce-send-modal-content input,
+		.vce-send-modal-content textarea { width:100%; margin-bottom:12px; }
+		.vce-send-modal-actions { display:flex; gap:8px; justify-content:flex-end; }
+		.vce-send-status { margin:8px 0 0; font-size:13px; }
+		</style>
+
+		<div class="vce-send-modal" id="vce-send-modal">
+			<div class="vce-send-modal-content">
+				<h3><?php esc_html_e( 'Send Virtual Card', VCE_TEXT_DOMAIN ); ?></h3>
+				<form id="vce-send-form">
+					<label for="vce-admin-email"><?php esc_html_e( 'Recipient Email', VCE_TEXT_DOMAIN ); ?> *</label>
+					<input type="email" id="vce-admin-email" required />
+
+					<label for="vce-admin-sender"><?php esc_html_e( 'Sender Name', VCE_TEXT_DOMAIN ); ?></label>
+					<input type="text" id="vce-admin-sender" />
+
+					<label for="vce-admin-message"><?php esc_html_e( 'Message', VCE_TEXT_DOMAIN ); ?></label>
+					<textarea id="vce-admin-message" rows="3"></textarea>
+
+					<div class="vce-send-modal-actions">
+						<button type="button" class="button" id="vce-send-cancel"><?php esc_html_e( 'Cancel', VCE_TEXT_DOMAIN ); ?></button>
+						<button type="submit" class="button button-primary" id="vce-send-submit"><?php esc_html_e( 'Send', VCE_TEXT_DOMAIN ); ?></button>
+					</div>
+					<p class="vce-send-status" id="vce-send-status" style="display:none;"></p>
+				</form>
+			</div>
+		</div>
+		<?php
 	}
 
 }
