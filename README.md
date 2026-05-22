@@ -114,7 +114,8 @@ Runs only if the panel nonce is present and verifies. If **`virtual_card_panel_i
 
 On **Virtual Cards → All Virtual Cards**:
 
-- **Category filter**: **`restrict_manage_posts`** outputs a **`virtual_card_category`** dropdown (same GET parameter name). **`parse_query`** applies a **`tax_query`** when a term is selected so the list matches that category (includes child terms).
+- **Category filter: restrict_manage_posts outputs a multi-select virtual_card_category dropdown using category_id[] as the GET parameter (supports selecting multiple terms). pre_get_posts applies a tax_query using the IN operator when one or more terms are selected
+- Adds a searchable multi-select taxonomy filter for virtual_card_category in the Virtual Cards admin list using Select2, allowing selection of multiple categories with improved UX.
 - **Extra columns** (inserted after **Title**):
 
 | Column | Meaning |
