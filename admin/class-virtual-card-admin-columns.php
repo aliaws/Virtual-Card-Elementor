@@ -54,76 +54,73 @@ class Virtual_Card_Admin_Columns {
 	/**
 	 * Taxonomy dropdown on the Virtual Cards list (same behaviour as core category filter).
 	 */
-	public function render_category_dropdown(): void {
-		global $typenow;
-		if ( Post_Type::POST_TYPE !== $typenow ) {
-			return;
-		}
+    public function render_category_dropdown(): void {
+        global $typenow;
 
-		$taxonomy = 'virtual_card_category';
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return;
-		}
+        if ( Post_Type::POST_TYPE !== $typenow ) {
+            return;
+        }
 
-		$selected = isset( $_GET[ $taxonomy ] ) ? (int) $_GET[ $taxonomy ] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $taxonomy = 'virtual_card_category';
 
-		wp_dropdown_categories(
-			[
-				'show_option_all' => __( 'All categories', VCE_TEXT_DOMAIN ),
-				'taxonomy'        => $taxonomy,
-				'name'            => $taxonomy,
-				'orderby'         => 'name',
-				'order'           => 'ASC',
-				'selected'        => $selected,
-				'hierarchical'    => true,
-				'depth'           => 0,
-				'show_count'      => false,
-				'hide_empty'      => false,
-				'value_field'     => 'term_id',
-			]
-		);
-	}
+        if ( ! taxonomy_exists( $taxonomy ) ) {
+            return;
+        }
+
+        $selected = isset( $_GET[ $taxonomy ] ) ? (int) $_GET[ $taxonomy ] : 0; // ID expected
+
+        wp_dropdown_categories(
+                [
+                        'show_option_all' => __( 'All categories', VCE_TEXT_DOMAIN ),
+                        'taxonomy'        => $taxonomy,
+                        'name'            => $taxonomy,
+                        'orderby'         => 'name',
+                        'order'           => 'ASC',
+                        'selected'        => $selected,
+                        'hierarchical'    => true,
+                        'show_count'      => false,
+                        'hide_empty'      => false,
+                        'value_field'     => 'term_id', // ✅ THIS is what makes it ID-based
+                ]
+        );
+    }
 
 	/**
 	 * Apply category filter to the main admin list query.
 	 *
 	 * @param \WP_Query $query Query instance.
 	 */
-	public function filter_by_selected_category( $query ): void {
-		if ( ! is_admin() || ! $query->is_main_query() ) {
-			return;
-		}
+    public function filter_by_selected_category( $query ): void {
 
-		if ( Post_Type::POST_TYPE !== $query->get( 'post_type' ) ) {
-			return;
-		}
+        if ( ! is_admin() || ! $query->is_main_query() ) {
+            return;
+        }
 
-		$taxonomy = 'virtual_card_category';
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return;
-		}
+        if ( Post_Type::POST_TYPE !== $query->get( 'post_type' ) ) {
+            return;
+        }
 
-		if ( empty( $_GET[ $taxonomy ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			return;
-		}
+        $taxonomy = 'virtual_card_category';
 
-		$term_id = (int) $_GET[ $taxonomy ]; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( $term_id <= 0 ) {
-			return;
-		}
+        if ( empty( $_GET[ $taxonomy ] ) ) {
+            return;
+        }
 
-		$query->set(
-			'tax_query',
-			[
-				[
-					'taxonomy'         => $taxonomy,
-					'field'            => 'term_id',
-					'terms'            => [ $term_id ],
-					'include_children' => true,
-				],
-			]
-		);
-	}
+        $term_id = (int) $_GET[ $taxonomy ];
+
+        if ( $term_id <= 0 ) {
+            return;
+        }
+
+        $query->set( 'tax_query', [
+                [
+                        'taxonomy'         => $taxonomy,
+                        'field'            => 'term_id',
+                        'terms'            => [ $term_id ],
+                        'include_children' => true,
+                ]
+        ] );
+    }
 
 	/**
 	 * Output column cell HTML.
