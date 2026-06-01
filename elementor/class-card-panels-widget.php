@@ -279,6 +279,37 @@ class Card_Panels_Widget extends Widget_Base {
 			}
 		}
 
+		// Auto-load saved submission layers for logged-in user on card page.
+		if ( empty( $saved_layers ) && \Virtual_Card_Elementor\Post_Type::POST_TYPE === $post->post_type ) {
+			$user_id = get_current_user_id();
+			if ( $user_id ) {
+				$existing = get_posts(
+					[
+						'post_type'      => \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE,
+						'post_status'    => 'publish',
+						'post_parent'    => $post->ID,
+						'posts_per_page' => 1,
+						'meta_key'       => \Virtual_Card_Elementor\Panel_Meta::SUBMISSION_SENDER_ID,
+						'meta_value'     => $user_id,
+						'meta_query'     => [
+							[
+								'key'     => \Virtual_Card_Elementor\Panel_Meta::SUBMISSION_STATUS,
+								'value'   => [ 'saved', 'scheduled' ],
+								'compare' => 'IN',
+							],
+						],
+						'fields'         => 'ids',
+					]
+				);
+				if ( ! empty( $existing ) ) {
+					$maybe = get_post_meta( (int) $existing[0], \Virtual_Card_Elementor\Panel_Meta::SUBMISSION_LAYERS_META_KEY, true );
+					if ( is_array( $maybe ) ) {
+						$saved_layers = $maybe;
+					}
+				}
+			}
+		}
+
 		if ( ( empty( $ids ) || ! is_array( $ids ) ) && \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type ) {
 			$parent_id = (int) wp_get_post_parent_id( $post->ID );
 			if ( $parent_id > 0 && \Virtual_Card_Elementor\Post_Type::POST_TYPE === get_post_type( $parent_id ) ) {

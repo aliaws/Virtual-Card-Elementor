@@ -189,6 +189,10 @@
 	gap: 8px;
 }
 
+.vce-panel-editor__field--bg .vce-panel-editor__color-tool {
+	gap: 4px;
+}
+
 .vce-panel-editor__color-hit {
 	display: inline-flex;
 	align-items: center;

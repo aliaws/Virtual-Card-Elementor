@@ -153,14 +153,15 @@ When the current post is a **`card_submission`**, the widget resolves panel imag
 
 **Front-end editor and submissions**
 
-- Editor UI is rendered by **`templates/frontend/card-panels-editor.php`** and powered by **`assets/js/frontend-panel-editor.js`** (depends on **`fabric`**, **`vce-frontend-panel-renderer`**, and optionally **`vce-debug-client`**). Toolbar: font, size, **text color**, preset swatches, **text background** + clear (**Fabric** `textBackgroundColor`, including per-range selection while editing), bold / italic / underline, filmstrip, **Final review**, **Save submission**.
-- Unsaved edits are **not** written to the **`virtual_card`** post or **`_virtual_card_panels`**. They are **not** persisted across a full page reload unless the user **saves a submission** (a new **`card_submission`** with **`_vce_submission_layers`** meta).
-- Users can click **Save submission** in the front-end editor (REST nonce is sent when the visitor is logged in).
-- Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`, **`permission_callback`** allows unauthenticated calls — restrict or harden at edge if you expose this site-wide).
-- Creates a new **`card_submission`**, sets **`post_parent`** to the source virtual card, stores the layer payload in **`_vce_submission_layers`**, and returns **`id`**, **`url`** / **`preview_url`** (query-string `/?post_type=card_submission&p=ID`), and **`edit_url`**.
+- Editor UI is rendered by **`templates/frontend/card-panels-editor.php`** and powered by **`assets/js/frontend-panel-editor.js`** (depends on **`fabric`**, **`vce-frontend-panel-renderer`**, and optionally **`vce-debug-client`**). Toolbar: font, size, **text color**, preset swatches, **text background** + clear (**Fabric** `textBackgroundColor`, including per-range selection while editing), bold / italic / underline, filmstrip, **Final review**, **Save submission**, **Save & Send**.
+- **Final review** button is positioned last in the toolbar action group.
+- Unsaved edits are **not** persisted across a full page reload unless the user **saves a submission**.
+- Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`). When the user is logged in, the endpoint finds an existing saved/scheduled submission by the same user + parent card and updates its layers. If none exists, a new **`card_submission`** is created.
+- Returns **`id`** and **`preview_url`** (query-string `/?post_type=card_submission&p=ID`).
 - **`_vce_submission_layers`** is a map keyed by panel index (`"0"`, `"1"`, …). Each value holds Fabric **`objects`** plus **`baseW`** / **`baseH`** (editor canvas size when saved) so coordinates scale in preview/submission.
-- After save, the editor opens the returned preview URL (new tab when allowed).
 - Parent virtual card panel attachments and **`_virtual_card_panels`** are not modified by submissions.
+- **Card pages**: when a logged-in user visits a card page, the widget auto-detects any saved/scheduled submission by that user for this card and loads its layers into the editor.
+- **My Submissions (WooCommerce My Account)**: users see a table of their submissions. **Edit** links go to the parent card page (auto-loads saved layers). **View** links go to the submission's public preview (for sent/viewed submissions).
 
 **Final review (editor) and submission view (browser)**
 
@@ -192,7 +193,7 @@ Use the widget on templates where the main queried post is the desired **`virtua
 
 **Profile hooks for UM/WooCommerce integration (`Profile_Hooks`)**
 
-- `woocommerce_account_menu_items`: Removes "edit-account", adds "Account Details" menu item.
+- `woocommerce_account_menu_items`: Removes "edit-account", adds "Account Details" and **"My Submissions"** menu items.
 - `woocommerce_get_endpoint_url`: Points Account Details to UM profile page (`/account-details/`).
 - `um_profile_permalink`: Changes UM profile link to WooCommerce my-account (`/my-account/`).
 - `um_get_option_filter__account_tab_privacy`: Disables Privacy tab in UM account page.
@@ -220,6 +221,7 @@ Use the widget on templates where the main queried post is the desired **`virtua
 | `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** |
 | `includes/class-template.php` | Template loader |
 | `includes/class-profile-hooks.php` | WooCommerce & UM profile integration hooks |
+| `includes/class-user-account.php` | My Submissions WooCommerce endpoint + shortcode |
 | `includes/class-um-hooks.php` | Logout redirect, UM/ECard filtering hooks |
 | `admin/class-panel-meta-box.php` | Card Panels + display order meta boxes, save handlers |
 | `admin/class-card-labels-meta-box.php` | Labels & Status meta box (Favorite, First/Second Level Labels) |
@@ -232,9 +234,11 @@ Use the widget on templates where the main queried post is the desired **`virtua
 | `templates/frontend/card-panels.php` | Frontend panel grid markup |
 | `templates/frontend/card-panels-editor.php` | Front-end editor shell |
 | `templates/frontend/card-panels-submission.php` | Submission final-view modal (carousel) |
+| `templates/frontend/my-submissions.php` | My Submissions table (WooCommerce My Account) |
 | `assets/css/admin-panel.css` | Admin panel meta styles |
 | `assets/css/frontend-panel.css` | Widget / grid styles |
 | `assets/css/frontend-panel-editor.css` | Front-end editor + preview/submission modal styles |
+| `assets/css/user-account.css` | My Submissions table + responsive styles |
 | `assets/js/admin-panel.js` | Admin media picker + reorder UI |
 | `assets/js/frontend-panel-editor.js` | Front-end editor, final review, submission save |
 | `assets/js/frontend-panel-renderer.js` | Shared Fabric helpers (`buildPreviewSlides`, `buildPreviewUrls`) |

@@ -44,9 +44,6 @@ if ( false === $saved_json ) {
 		<div class="vce-panel-editor__toolbar-main">
 			<div class="vce-panel-editor__toolbar-row vce-panel-editor__toolbar-row--actions">
 				<div class="vce-panel-editor__actions">
-					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
-						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
-					</button>
 					<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--ghost" data-vce-add-text>
 						<?php esc_html_e( 'Add text', VCE_TEXT_DOMAIN ); ?>
 					</button>
@@ -55,6 +52,9 @@ if ( false === $saved_json ) {
 					</button>
 					<button type="button" class="button button-secondary vce-panel-editor__btn" data-vce-save-send>
 						<?php esc_html_e( 'Save & Send', VCE_TEXT_DOMAIN ); ?>
+					</button>
+					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
+						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
 					</button>
 				</div>
 				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--danger" data-vce-delete-layer disabled>
@@ -126,8 +126,8 @@ if ( false === $saved_json ) {
 				</span>
 			</label>
 			<label class="vce-panel-editor__field vce-panel-editor__field--bg">
-				<span class="vce-panel-editor__field-label"><?php esc_html_e( 'Text background', VCE_TEXT_DOMAIN ); ?></span>
 				<span class="vce-panel-editor__color-tool">
+					<span class="vce-panel-editor__field-label"><?php esc_html_e( 'Text background', VCE_TEXT_DOMAIN ); ?></span>
 					<label class="vce-panel-editor__color-hit" title="<?php echo esc_attr__( 'Pick text background color', VCE_TEXT_DOMAIN ); ?>">
 						<span class="vce-sr-only"><?php esc_html_e( 'Text background color', VCE_TEXT_DOMAIN ); ?></span>
 						<input
