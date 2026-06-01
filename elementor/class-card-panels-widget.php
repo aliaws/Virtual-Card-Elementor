@@ -262,28 +262,15 @@ class Card_Panels_Widget extends Widget_Base {
 	protected function render() {
 		global $post;
 
-        $user_id = get_current_user_id();
-        // 1. Priority: GET id
-        $submission_id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+		$draft_submission = null;
+		$user_id          = get_current_user_id();
+		// 1. Priority: ?id= submission from My Submissions edit link.
+		$submission_id = isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0;
 
-        // 2. Fallback: last draft submission
-        if (!$submission_id) {
-            $submission_id = get_option("LAST_DRAFT_SUBMISSION_{$user_id}");
-        }
-
-        if (!empty($submission_id)) {
-
-            $draft_submission = get_post($submission_id);
-
-            if (
-                $draft_submission &&
-                $draft_submission->post_type === \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE
-            ) {
-                $post = $draft_submission;
-                setup_postdata($post);
-            }
-        }
-
+		// 2. Fallback: last saved draft for this user (must match parent E-card below).
+		if ( ! $submission_id && $user_id ) {
+			$submission_id = absint( get_option( "LAST_DRAFT_SUBMISSION_{$user_id}", 0 ) );
+		}
 
 		if ( ! $post ) {
 			return;
@@ -294,13 +281,24 @@ class Card_Panels_Widget extends Widget_Base {
 		$ids          = get_post_meta( $source, Panel_Meta::META_KEY, true );
 		$saved_layers = [];
 
-		// Submissions can inherit panels from their parent virtual card without mutating the original card.
-		if ( \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type ) {
-			$maybe_saved = get_post_meta( $post->ID, Panel_Meta::SUBMISSION_LAYERS_META_KEY, true );
-			if ( is_array( $maybe_saved ) ) {
-				$saved_layers = $maybe_saved;
+		// Load draft layers only when the submission belongs to this E-card (avoid wrong parent).
+		if ( $submission_id > 0 ) {
+			$draft_submission = get_post( $submission_id );
+			if (
+				$draft_submission instanceof \WP_Post
+				&& \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $draft_submission->post_type
+				&& (int) $draft_submission->post_parent === (int) $post->ID
+			) {
+				$maybe_saved = get_post_meta( $draft_submission->ID, Panel_Meta::SUBMISSION_LAYERS_META_KEY, true );
+				if ( is_array( $maybe_saved ) ) {
+					$saved_layers = $maybe_saved;
+				}
+			} else {
+				$submission_id    = 0;
+				$draft_submission = null;
 			}
 		}
+
 
 		if ( ( empty( $ids ) || ! is_array( $ids ) ) && \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type ) {
 			$parent_id = (int) wp_get_post_parent_id( $post->ID );
@@ -340,12 +338,15 @@ class Card_Panels_Widget extends Widget_Base {
 
 		$is_submission = \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type;
 		$editor_on     = ! $is_submission && ! empty( $settings['enable_front_editor'] ) && 'yes' === $settings['enable_front_editor'];
-		$can_edit  = function_exists( 'vce_can_use_front_editor' ) && vce_can_use_front_editor();
-        $status         = get_post_meta( $post->ID, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved';
+		$can_edit = function_exists( 'vce_can_use_front_editor' ) && vce_can_use_front_editor();
+		$status   = 'saved';
+		if ( $submission_id > 0 && $draft_submission instanceof \WP_Post ) {
+			$status = get_post_meta( $draft_submission->ID, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved';
+		} elseif ( $is_submission ) {
+			$status = get_post_meta( $post->ID, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved';
+		}
 
-
-
-		if ( ($status == "saved" || $status == "scheduled") && $can_edit ) {
+		if ( $can_edit && ( $editor_on || ( $submission_id > 0 && in_array( $status, array( 'saved', 'scheduled' ), true ) ) ) ) {
 
 			$font_key = isset( $settings['editor_font_family'] ) ? (string) $settings['editor_font_family'] : 'system';
 
@@ -358,9 +359,9 @@ class Card_Panels_Widget extends Widget_Base {
 				'defaultFont'  => $font_key,
 				'fontStacks'   => self::get_font_stacks_for_js(),
 				'submissionApi' => [
-					'endpoint' => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
-                    'submission_id' => $submission_id,
-					'nonce'    => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
+					'endpoint'      => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
+					'submission_id' => $submission_id,
+					'nonce'         => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
 				],
 				'emailApi' => [
 					'endpoint' => esc_url_raw( rest_url( 'vce/v1/send-email' ) ),
