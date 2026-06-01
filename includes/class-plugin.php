@@ -11,6 +11,7 @@ use Virtual_Card_Elementor\Admin\Attachment_Tags;
 use Virtual_Card_Elementor\Admin\Card_Labels_Meta_Box;
 use Virtual_Card_Elementor\Admin\Card_Submission_Admin;
 use Virtual_Card_Elementor\Admin\Panel_Meta_Box;
+use Virtual_Card_Elementor\Admin\Virtual_Card_Gallery_Page;
 use Virtual_Card_Elementor\Admin\Virtual_Card_Admin_Columns;
 use Virtual_Card_Elementor\Elementor\Card_Panels_Widget;
 
@@ -95,6 +96,9 @@ class Plugin {
 
 		$attachment_tags = new Attachment_Tags();
 		$attachment_tags->register_hooks();
+
+		$gallery_page = new Virtual_Card_Gallery_Page();
+		$gallery_page->register_hooks();
 
 		$user_account = new User_Account();
 		$user_account->register_hooks();
