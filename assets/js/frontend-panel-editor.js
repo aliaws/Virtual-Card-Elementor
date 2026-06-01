@@ -1058,7 +1058,7 @@
 					if (!result.ok) {
 						throw new Error('email_failed');
 					}
-					var msg = i18n.emailSent || 'Card sent successfully!';
+					var msg = i18n.emailSent || 'E-Card sent successfully!';
 					setEmailStatus(msg);
 				})
 				.catch(function () {

@@ -142,7 +142,7 @@ final class Card_Email_Rest {
 		return new WP_REST_Response(
 			[
 				'success' => true,
-				'message' => __( 'Card sent successfully!', VCE_TEXT_DOMAIN ),
+				'message' => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
 			],
 			200
 		);
@@ -230,7 +230,7 @@ final class Card_Email_Rest {
 		return new WP_REST_Response(
 			[
 				'success' => true,
-				'message' => __( 'Card sent successfully!', VCE_TEXT_DOMAIN ),
+				'message' => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
 			],
 			200
 		);

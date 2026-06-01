@@ -382,7 +382,7 @@ class Card_Panels_Widget extends Widget_Base {
 						VCE_TEXT_DOMAIN
 					),
 					'sendEmail'           => __( 'Send', VCE_TEXT_DOMAIN ),
-					'emailSent'           => __( 'Card sent successfully!', VCE_TEXT_DOMAIN ),
+					'emailSent'           => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
 					'emailFailed'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
 					'recipientRequired'   => __( 'Please enter a recipient email.', VCE_TEXT_DOMAIN ),
 					'preparingPreview'    => __( 'Building preview...', VCE_TEXT_DOMAIN ),
