@@ -21,7 +21,93 @@ final class User_Account {
 	 */
 	public function register_hooks(): void {
 		add_shortcode( 'user_account_menu', [ $this, 'render_shortcode' ] );
+		add_shortcode( 'vce_my_submissions', [ $this, 'render_my_submissions_shortcode' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+		add_action( 'init', [ $this, 'register_my_submissions_endpoint' ] );
+		add_action( 'woocommerce_account_my-submissions_endpoint', [ $this, 'render_my_submissions' ] );
+	}
+
+	/**
+	 * Register WooCommerce My Account endpoint for My Submissions.
+	 */
+	public function register_my_submissions_endpoint(): void {
+		if ( function_exists( 'add_rewrite_endpoint' ) ) {
+			add_rewrite_endpoint( 'my-submissions', EP_ROOT | EP_PAGES );
+		}
+	}
+
+	/**
+	 * Render My Submissions content for WooCommerce My Account page.
+	 */
+	public function render_my_submissions(): void {
+		$this->enqueue_assets();
+		wp_enqueue_style( 'vce-user-account' );
+		echo $this->get_my_submissions_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Shortcode to render My Submissions on any page.
+	 *
+	 * @return string
+	 */
+	public function render_my_submissions_shortcode(): string {
+		$this->enqueue_assets();
+		wp_enqueue_style( 'vce-user-account' );
+		return $this->get_my_submissions_html();
+	}
+
+	/**
+	 * Build the My Submissions table HTML.
+	 *
+	 * @return string
+	 */
+	private function get_my_submissions_html(): string {
+		if ( ! is_user_logged_in() ) {
+			return '<p>' . esc_html__( 'Please log in to view your submissions.', VCE_TEXT_DOMAIN ) . '</p>';
+		}
+
+		$user_id  = get_current_user_id();
+		$submissions = get_posts(
+			[
+				'post_type'      => Post_Type::CARD_SUBMISSION_POST_TYPE,
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'meta_key'       => Panel_Meta::SUBMISSION_SENDER_ID,
+				'meta_value'     => $user_id,
+				'orderby'        => 'date',
+				'order'          => 'DESC',
+			]
+		);
+
+		if ( empty( $submissions ) ) {
+			return '<p>' . esc_html__( 'No submissions yet.', VCE_TEXT_DOMAIN ) . '</p>';
+		}
+
+		$status_labels = [
+			'saved'     => __( 'Saved', VCE_TEXT_DOMAIN ),
+			'scheduled' => __( 'Scheduled', VCE_TEXT_DOMAIN ),
+			'sent'      => __( 'Sent', VCE_TEXT_DOMAIN ),
+			'viewed'    => __( 'Viewed', VCE_TEXT_DOMAIN ),
+		];
+
+		$status_colors = [
+			'saved'     => '#f0ad4e',
+			'scheduled' => '#f0ad4e',
+			'sent'      => '#5bc0de',
+			'viewed'    => '#5cb85c',
+		];
+
+		ob_start();
+		Template::render(
+			'frontend/my-submissions.php',
+			[
+				'submissions'    => $submissions,
+				'status_labels'  => $status_labels,
+				'status_colors'  => $status_colors,
+				'user_id'        => $user_id,
+			]
+		);
+		return (string) ob_get_clean();
 	}
 
 	/**

@@ -3,7 +3,7 @@
 	<p class="vce-gallery-count"><?php echo esc_html( sprintf( __( 'Total cards: %d', VCE_TEXT_DOMAIN ), $total ) ); ?></p>
 
 	<?php if ( ! $query->have_posts() ) : ?>
-		<p><?php esc_html_e( 'No virtual cards found.', VCE_TEXT_DOMAIN ); ?></p>
+		<p><?php esc_html_e( 'No E-cards found.', VCE_TEXT_DOMAIN ); ?></p>
 	<?php else : ?>
 		<div class="vce-gallery-grid">
 			<?php while ( $query->have_posts() ) : $query->the_post(); ?>

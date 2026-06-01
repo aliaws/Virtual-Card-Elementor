@@ -44,9 +44,6 @@ if ( false === $saved_json ) {
 		<div class="vce-panel-editor__toolbar-main">
 			<div class="vce-panel-editor__toolbar-row vce-panel-editor__toolbar-row--actions">
 				<div class="vce-panel-editor__actions">
-					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
-						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
-					</button>
 					<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--ghost" data-vce-add-text>
 						<?php esc_html_e( 'Add text', VCE_TEXT_DOMAIN ); ?>
 					</button>
@@ -55,6 +52,9 @@ if ( false === $saved_json ) {
 					</button>
 					<button type="button" class="button button-secondary vce-panel-editor__btn" data-vce-save-send>
 						<?php esc_html_e( 'Save & Send', VCE_TEXT_DOMAIN ); ?>
+					</button>
+					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
+						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
 					</button>
 				</div>
 				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--danger" data-vce-delete-layer disabled>
@@ -126,8 +126,8 @@ if ( false === $saved_json ) {
 				</span>
 			</label>
 			<label class="vce-panel-editor__field vce-panel-editor__field--bg">
-				<span class="vce-panel-editor__field-label"><?php esc_html_e( 'Text background', VCE_TEXT_DOMAIN ); ?></span>
 				<span class="vce-panel-editor__color-tool">
+					<span class="vce-panel-editor__field-label"><?php esc_html_e( 'Text background', VCE_TEXT_DOMAIN ); ?></span>
 					<label class="vce-panel-editor__color-hit" title="<?php echo esc_attr__( 'Pick text background color', VCE_TEXT_DOMAIN ); ?>">
 						<span class="vce-sr-only"><?php esc_html_e( 'Text background color', VCE_TEXT_DOMAIN ); ?></span>
 						<input
@@ -210,36 +210,38 @@ if ( false === $saved_json ) {
 		</div>
 	</div>
 
-	<div class="vce-panel-editor__stage-outer">
-		<div class="vce-panel-editor__stage" data-vce-stage>
-			<div class="vce-panel-editor__stage-inner" data-vce-stage-inner>
-				<div class="vce-panel-editor__canvas-wrap" data-vce-canvas-wrap>
-					<canvas class="vce-panel-editor__fabric" data-vce-fabric-canvas width="800" height="600"></canvas>
+	<div class="vce-panel-editor__workspace">
+		<div class="vce-panel-editor__filmstrip-wrap">
+			<p class="vce-panel-editor__filmstrip-title"><?php esc_html_e( 'Panels', VCE_TEXT_DOMAIN ); ?></p>
+			<ul class="vce-panel-editor__filmstrip" data-vce-filmstrip>
+				<?php foreach ( $panels_data as $index => $p ) : ?>
+					<li>
+						<button
+							type="button"
+							class="vce-panel-editor__thumb<?php echo 0 === (int) $index ? ' is-active' : ''; ?>"
+							data-vce-thumb
+							data-index="<?php echo esc_attr( (string) $index ); ?>"
+							aria-label="<?php echo esc_attr( sprintf( /* translators: %d: panel number */ __( 'Panel %d', VCE_TEXT_DOMAIN ), (int) $index + 1 ) ); ?>"
+							aria-pressed="<?php echo 0 === (int) $index ? 'true' : 'false'; ?>"
+						>
+							<?php if ( ! empty( $p['thumb'] ) ) : ?>
+								<img src="<?php echo esc_url( $p['thumb'] ); ?>" alt="" width="80" height="80" loading="lazy" />
+							<?php endif; ?>
+						</button>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+
+		<div class="vce-panel-editor__stage-outer">
+			<div class="vce-panel-editor__stage" data-vce-stage>
+				<div class="vce-panel-editor__stage-inner" data-vce-stage-inner>
+					<div class="vce-panel-editor__canvas-wrap" data-vce-canvas-wrap>
+						<canvas class="vce-panel-editor__fabric" data-vce-fabric-canvas width="800" height="600"></canvas>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
-
-	<div class="vce-panel-editor__filmstrip-wrap">
-		<p class="vce-panel-editor__filmstrip-title"><?php esc_html_e( 'Panels', VCE_TEXT_DOMAIN ); ?></p>
-		<ul class="vce-panel-editor__filmstrip" data-vce-filmstrip>
-			<?php foreach ( $panels_data as $index => $p ) : ?>
-				<li>
-					<button
-						type="button"
-						class="vce-panel-editor__thumb<?php echo 0 === (int) $index ? ' is-active' : ''; ?>"
-						data-vce-thumb
-						data-index="<?php echo esc_attr( (string) $index ); ?>"
-						aria-label="<?php echo esc_attr( sprintf( /* translators: %d: panel number */ __( 'Panel %d', VCE_TEXT_DOMAIN ), (int) $index + 1 ) ); ?>"
-						aria-pressed="<?php echo 0 === (int) $index ? 'true' : 'false'; ?>"
-					>
-						<?php if ( ! empty( $p['thumb'] ) ) : ?>
-							<img src="<?php echo esc_url( $p['thumb'] ); ?>" alt="" width="80" height="80" loading="lazy" />
-						<?php endif; ?>
-					</button>
-				</li>
-			<?php endforeach; ?>
-		</ul>
 	</div>
 
 	<div class="vce-preview-modal vce-preview-modal--fullpage" data-vce-preview-modal hidden>

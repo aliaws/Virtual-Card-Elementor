@@ -142,7 +142,7 @@ final class Card_Email_Rest {
 		return new WP_REST_Response(
 			[
 				'success' => true,
-				'message' => __( 'Card sent successfully!', VCE_TEXT_DOMAIN ),
+				'message' => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
 			],
 			200
 		);
@@ -214,6 +214,8 @@ final class Card_Email_Rest {
 				'post_title' => sprintf( '(VC - %d, Sender - %d, RC - %s)', $parent_id ?: 0, $sender_id, $recipient_email ),
 			],
 		);
+        $user_id = get_current_user_id();
+        delete_option("LAST_DRAFT_SUBMISSION_{$user_id}");
 
 		Submission_Logger::log(
 			$submission_id,
@@ -228,7 +230,7 @@ final class Card_Email_Rest {
 		return new WP_REST_Response(
 			[
 				'success' => true,
-				'message' => __( 'Card sent successfully!', VCE_TEXT_DOMAIN ),
+				'message' => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
 			],
 			200
 		);

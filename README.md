@@ -185,7 +185,19 @@ When the current post is a **`card_submission`**, the widget resolves panel imag
 
 Use the widget on templates where the main queried post is the desired **`virtual_card`** or a **`card_submission`** single.
 
-### Elementor e-cards query (`Um_Hooks`)
+- Editor UI is rendered by **`templates/frontend/card-panels-editor.php`** and powered by **`assets/js/frontend-panel-editor.js`** (depends on **`fabric`**, **`vce-frontend-panel-renderer`**, and optionally **`vce-debug-client`**). Toolbar: font, size, **text color**, preset swatches, **text background** + clear (**Fabric** `textBackgroundColor`, including per-range selection while editing), bold / italic / underline, filmstrip, **Final review**, **Save submission**, **Save & Send**.
+- **Final review** button is positioned last in the toolbar action group.
+- Unsaved in-browser text (before **Save submission**) is **not** persisted across a full page reload; the toolbar may warn on leave when local draft content exists.
+- **Saved drafts** are stored as **`card_submission`** posts with status meta **`saved`** (or **`scheduled`**). Layers live in **`_vce_submission_layers`**; the virtual card’s panel attachments are never modified.
+- Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`). JSON body: **`parentId`**, **`layers`**, and optional **`submission_id`**. When **`submission_id`** is `0` or omitted, a new **`card_submission`** is created; otherwise the existing post is updated (layers + **`post_modified`**). Response includes **`id`**, **`preview_url`**, **`url`**, and **`edit_url`**.
+- After each successful save, the plugin stores the post ID in user option **`LAST_DRAFT_SUBMISSION_{user_id}`** so the editor can resume the most recently saved draft. Sending email (**`Card_Email_Rest`**) clears that option for the current user.
+- **`_vce_submission_layers`** is a map keyed by panel index (`"0"`, `"1"`, …). Each value holds Fabric **`objects`** plus **`baseW`** / **`baseH`** (editor canvas size when saved) so coordinates scale in preview/submission.
+- **Loading a draft in the editor** (`Card_Panels_Widget::render()`):
+  1. If the URL has **`?id={submission_id}`** (from **My Submissions → Edit**), that submission is loaded.
+  2. Otherwise, if the user has **`LAST_DRAFT_SUBMISSION_{user_id}`**, that submission is loaded.
+  3. The widget temporarily treats the submission as the current post so panel images come from the parent **`virtual_card`** and layers from **`_vce_submission_layers`**.
+- The front-end editor is shown when the loaded submission’s status is **`saved`** or **`scheduled`** and **`vce_can_use_front_editor()`** is true (not only when the queried post is a **`virtual_card`** with the widget’s “enable front editor” setting). **`submission_id`** is passed to JS as **`vcePanelEditor.submissionApi.submission_id`** so subsequent saves update the same post.
+- **My Submissions (WooCommerce My Account**, endpoint **`my-submissions`**, template **`templates/frontend/my-submissions.php`**): logged-in users see a numbered table of their **`card_submission`** posts (by **`_vce_submission_sender_id`**). Status badges: **Saved**, **Scheduled**, **Sent**, **Viewed**. **Edit** (saved/scheduled only) links to the parent virtual card with **`?id={submission_id}`**. **Preview** links open the submission’s front-end view (sent/viewed).
 
 Set **Query ID** to **`custom_e_cards`** on Posts / Loop Grid / Loop Carousel / Archive Posts / Portfolio widgets that list **`virtual_card`** posts.
 
@@ -326,7 +338,10 @@ Use **slugs** (recommended), or numeric term IDs:
 **Pricing notice**  
 Redirects to **`/pricing/?notice=subscription_required`** (guests to **`/login/`** first). On the **pricing** page, injects a notice before Elementor heading **`.elementor-element-0ab951d`**.
 
-### Media library: attachment tags (`Attachment_Tags`)
+- `woocommerce_account_menu_items`: Removes "edit-account", adds "Account Details" and **"My Submissions"** menu items.
+- `woocommerce_get_endpoint_url`: Points Account Details to UM profile page (`/account-details/`).
+- `um_profile_permalink`: Changes UM profile link to WooCommerce my-account (`/my-account/`).
+- `um_get_option_filter__account_tab_privacy`: Disables Privacy tab in UM account page.
 
 - **Tags** field on attachment details (after File URL) in media modal and attachment edit screen.
 - Stored in **`_vce_attachment_tags`** (comma-separated; max 50 tags, 100 chars each).
@@ -351,6 +366,8 @@ Redirects to **`/pricing/?notice=subscription_required`** (guests to **`/login/`
 
 Public REST routes should be restricted at the server or edge if the site is exposed to untrusted traffic.
 
+**Submission status meta** (`Panel_Meta::SUBMISSION_STATUS` on **`card_submission`**): **`saved`**, **`scheduled`**, **`sent`**, **`viewed`**. Admin list/meta box and My Submissions use matching labels and colors (including **Scheduled** in **`admin/class-card-submission-meta-box.php`**).
+
 ## File layout
 
 | Path | Role |
@@ -363,6 +380,25 @@ Public REST routes should be restricted at the server or edge if the site is exp
 | `includes/class-template.php` | Template loader |
 | `includes/class-debug-log.php` | Diagnostic logging + debug client assets |
 | `includes/class-vce-debug-rest.php` | REST **`vce/v1/debug-client`** |
+| `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** (create/update drafts) |
+| `includes/class-card-email-rest.php` | REST **`vce/v1/send-email`** |
+| `admin/class-card-submission-meta-box.php` | Submission status display in admin |
+| `includes/class-template.php` | Template loader |
+| `includes/class-profile-hooks.php` | WooCommerce & UM profile integration hooks |
+| `includes/class-user-account.php` | My Submissions WooCommerce endpoint + shortcode |
+| `includes/class-um-hooks.php` | Logout redirect, UM/ECard filtering hooks |
+| `admin/class-panel-meta-box.php` | Card Panels + display order meta boxes, save handlers |
+| `admin/class-card-labels-meta-box.php` | Labels & Status meta box (Favorite, First/Second Level Labels) |
+| `admin/class-virtual-card-admin-columns.php` | Virtual Cards list: panels count, WIX ID, category filter, favorite filter |
+| `admin/class-card-submission-admin.php` | Submissions list, final view link, parent filter/meta box |
+| `admin/class-attachment-tags.php` | Attachment Tags field + AJAX + Tagify enqueue |
+| `admin/class-vce-debug-page.php` | **Tools → VCE debug** admin page |
+| `elementor/class-card-panels-widget.php` | Elementor widget |
+| `templates/admin/panel-meta-box.php` | Admin markup |
+| `templates/frontend/card-panels.php` | Frontend panel grid markup |
+| `templates/frontend/card-panels-editor.php` | Front-end editor shell |
+| `templates/frontend/card-panels-submission.php` | Submission final-view modal (carousel) |
+| `templates/frontend/my-submissions.php` | My Submissions table (WooCommerce My Account) |
 | `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** |
 | `includes/class-card-email-rest.php` | REST **`vce/v1/send-email`**, **`admin-send-email`** |
 | `includes/class-card-view-rest.php` | REST **`vce/v1/track-view`** |

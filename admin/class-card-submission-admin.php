@@ -129,7 +129,7 @@ class Card_Submission_Admin {
 			'vce_parent_card',
 			'vce_parent_card',
 			$selected,
-			__( 'All virtual cards', VCE_TEXT_DOMAIN ),
+			__( 'All E-cards', VCE_TEXT_DOMAIN ),
 			false
 		);
 	}
@@ -262,7 +262,7 @@ JS;
 	public function add_parent_meta_box(): void {
 		add_meta_box(
 			'vce_submission_parent',
-			__( 'Parent virtual card', VCE_TEXT_DOMAIN ),
+			__( 'Parent E-card', VCE_TEXT_DOMAIN ),
 			[ $this, 'render_parent_meta_box' ],
 			Post_Type::CARD_SUBMISSION_POST_TYPE,
 			'side',
