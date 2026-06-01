@@ -46,6 +46,22 @@ if ( ! defined( 'VCE_DEBUG' ) ) {
 	define( 'VCE_DEBUG', false );
 }
 
+if ( ! function_exists( 'vce_bootstrap_require' ) ) {
+	/**
+	 * Load a plugin PHP file when present (prevents fatal if a partial deploy misses new files).
+	 *
+	 * @param string $relative_path Path relative to the plugin root.
+	 */
+	function vce_bootstrap_require( string $relative_path ): bool {
+		$path = VCE_PLUGIN_DIR . ltrim( str_replace( '\\', '/', $relative_path ), '/' );
+		if ( ! is_readable( $path ) ) {
+			return false;
+		}
+		require_once $path;
+		return true;
+	}
+}
+
 require_once VCE_PLUGIN_DIR . 'includes/class-panel-meta.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-template.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-editor-access.php';
@@ -57,6 +73,8 @@ require_once VCE_PLUGIN_DIR . 'includes/class-card-email-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-view-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-submission-logger.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-shortcodes.php';
+vce_bootstrap_require( 'includes/class-ecard-category-filter.php' );
+vce_bootstrap_require( 'includes/class-ecard-category-tabs.php' );
 require_once VCE_PLUGIN_DIR . 'admin/class-card-submission-meta-box.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-plugin.php';
 

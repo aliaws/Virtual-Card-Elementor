@@ -136,19 +136,9 @@ class Um_Hooks {
 			return;
 		}
 
-		foreach ( $_REQUEST as $key => $value ) {
-			if ( strpos( $key, 'e-filter' ) !== false ) {
-				$query->set(
-					'tax_query',
-					[
-						[
-							'taxonomy' => 'virtual_card_category',
-							'field'    => 'slug',
-							'terms'    => sanitize_text_field( wp_unslash( $value ) ),
-						],
-					]
-				);
-			}
+		// Category tabs (?vce_category=slug) and Elementor e-filter URLs.
+		if ( class_exists( Ecard_Category_Filter::class ) ) {
+			Ecard_Category_Filter::apply_to_query( $query );
 		}
 
 		$url_orderby = isset( $_REQUEST['orderby'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['orderby'] ) ) : '';

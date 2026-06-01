@@ -33,6 +33,11 @@ class Panel_Meta {
 	public const ORDERBY_DISPLAY_ORDER = 'vce_display_order';
 
 	/**
+	 * Front-end category filter query arg ({@see Ecard_Category_Filter::QUERY_VAR}).
+	 */
+	public const CATEGORY_QUERY_VAR = 'vce_category';
+
+	/**
 	 * Is Favorite (checkbox).
 	 */
 	public const IS_FAVORITE_META_KEY = '_vce_is_favorite';
