@@ -221,8 +221,10 @@
 
 		var activeIndex = 0;
 		var layersByPanel = parseSavedLayers(root);
-		/** True while local draft has text layers (browser-only; warn on leave). */
+		/** True when layers differ from the last successful server save (warn on leave). */
 		var draftDirty = false;
+		/** False after a successful save/send or when server layers were loaded on init. */
+		var syncedWithServer = false;
 		var loadingPanel = false;
 		var previewSlides = [];
 		var previewIndex = 0;
@@ -300,7 +302,12 @@
 		}
 
 		function updateDraftDirtyFlag() {
-			draftDirty = hasAnyLayerContent();
+			draftDirty = hasAnyLayerContent() && !syncedWithServer;
+		}
+
+		function markSyncedWithServer() {
+			syncedWithServer = true;
+			draftDirty = false;
 		}
 
 		function getPanelState(index) {
@@ -312,7 +319,7 @@
 			return [];
 		}
 
-		function saveCurrentPanelObjects() {
+		function saveCurrentPanelObjects(isUserEdit) {
 			if (loadingPanel) {
 				return;
 			}
@@ -326,6 +333,9 @@
 				baseH: fabricCanvas.getHeight() || 0,
 			};
 			saveDraft();
+			if (isUserEdit) {
+				syncedWithServer = false;
+			}
 			updateDraftDirtyFlag();
 		}
 
@@ -578,7 +588,7 @@
 			}
 			t.dirty = true;
 			fabricCanvas.requestRenderAll();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 			syncToolbarFromSelection();
 		}
 
@@ -647,7 +657,6 @@
 				updateThumbs();
 				loadingPanel = false;
 				syncToolbarFromSelection();
-				updateDraftDirtyFlag();
 			});
 		}
 
@@ -671,7 +680,7 @@
 			fabricCanvas.setActiveObject(text);
 			fabricCanvas.requestRenderAll();
 			syncToolbarFromSelection();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 			text.enterEditing();
 			text.selectAll();
 		}
@@ -683,7 +692,7 @@
 			}
 			obj.set('fontFamily', getFontStack());
 			fabricCanvas.requestRenderAll();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 		}
 
 		function deleteSelected() {
@@ -695,7 +704,7 @@
 			fabricCanvas.discardActiveObject();
 			fabricCanvas.requestRenderAll();
 			syncToolbarFromSelection();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 		}
 
 		function applySize() {
@@ -705,7 +714,7 @@
 			}
 			obj.set('fontSize', clamp(parseInt(inputSize.value, 10) || 28, 12, 96));
 			fabricCanvas.requestRenderAll();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 		}
 
 		function applyColor() {
@@ -726,7 +735,7 @@
 			}
 			obj.dirty = true;
 			fabricCanvas.requestRenderAll();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 			syncToolbarFromSelection();
 		}
 
@@ -747,7 +756,7 @@
 			}
 			obj.dirty = true;
 			fabricCanvas.requestRenderAll();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 			syncToolbarFromSelection();
 		}
 
@@ -764,7 +773,7 @@
 			}
 			obj.dirty = true;
 			fabricCanvas.requestRenderAll();
-			saveCurrentPanelObjects();
+			saveCurrentPanelObjects(true);
 			syncToolbarFromSelection();
 		}
 
@@ -931,6 +940,10 @@
 					if (!result.ok || !result.data) {
 						throw new Error('save_failed');
 					}
+					if (result.data.id) {
+						submissionApi.submission_id = result.data.id;
+					}
+					markSyncedWithServer();
 					var msg = i18n.submissionSaved || 'Submission saved successfully!';
 					setSubmissionLink(msg, '');
 				})
@@ -1001,6 +1014,7 @@
 				credentials: 'same-origin',
 				body: JSON.stringify({
 					parentId: parseInt(root.getAttribute('data-source-card-id') || postId || '0', 10) || 0,
+					submission_id: submissionApi.submission_id,
 					layers: layersByPanel,
 				}),
 			})
@@ -1012,6 +1026,9 @@
 				.then(function (result) {
 					if (!result.ok || !result.data) {
 						throw new Error('save_failed');
+					}
+					if (result.data.id) {
+						submissionApi.submission_id = result.data.id;
 					}
 
 					setEmailStatus(i18n.preparingPreview || 'Building preview...');
@@ -1058,6 +1075,7 @@
 					if (!result.ok) {
 						throw new Error('email_failed');
 					}
+					markSyncedWithServer();
 					var msg = i18n.emailSent || 'E-Card sent successfully!';
 					setEmailStatus(msg);
 				})
@@ -1074,8 +1092,12 @@
 		fabricCanvas.on('selection:updated', syncToolbarFromSelection);
 		fabricCanvas.on('selection:cleared', syncToolbarFromSelection);
 
-		fabricCanvas.on('object:modified', saveCurrentPanelObjects);
-		fabricCanvas.on('text:changed', saveCurrentPanelObjects);
+		fabricCanvas.on('object:modified', function () {
+			saveCurrentPanelObjects(true);
+		});
+		fabricCanvas.on('text:changed', function () {
+			saveCurrentPanelObjects(true);
+		});
 		fabricCanvas.on('text:selection:changed', syncToolbarFromSelection);
 
 		if (btnAdd) {
@@ -1212,6 +1234,8 @@
 		}
 
 		loadDraft();
+		syncedWithServer =
+			hasAnyLayerContent() || !!(submissionApi && submissionApi.submission_id);
 		updateDraftDirtyFlag();
 		loadPanel(0, true);
 
