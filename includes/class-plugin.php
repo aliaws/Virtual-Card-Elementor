@@ -19,6 +19,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// E-card category tabs + filtering (safe load if deploy omits new files).
+if ( function_exists( 'vce_bootstrap_require' ) ) {
+	vce_bootstrap_require( 'includes/class-ecard-category-filter.php' );
+	vce_bootstrap_require( 'includes/class-ecard-category-tabs.php' );
+}
+
 require_once VCE_PLUGIN_DIR . 'admin/class-virtual-card-admin-columns.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-card-submission-admin.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-attachment-tags.php';
@@ -102,6 +108,27 @@ class Plugin {
 
 		$user_account = new User_Account();
 		$user_account->register_hooks();
+
+		if ( class_exists( Ecard_Category_Tabs::class ) ) {
+			$ecard_tabs = new Ecard_Category_Tabs();
+			$ecard_tabs->register_hooks();
+		} elseif ( is_admin() && current_user_can( 'manage_options' ) ) {
+			add_action(
+				'admin_notices',
+				static function (): void {
+					if ( ! current_user_can( 'manage_options' ) ) {
+						return;
+					}
+					echo '<div class="notice notice-error"><p>';
+					echo esc_html__(
+						'Virtual Card Elementor: missing includes/class-ecard-category-tabs.php (and/or class-ecard-category-filter.php). Re-upload the full plugin package.',
+						VCE_TEXT_DOMAIN
+					);
+					echo '</p></div>';
+				}
+			);
+		}
+
 		$um_hooks = new Um_Hooks();
 		$um_hooks->register_hooks();
 
