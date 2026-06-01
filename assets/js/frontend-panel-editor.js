@@ -918,6 +918,7 @@
 				credentials: 'same-origin',
 				body: JSON.stringify({
 					parentId: parseInt(root.getAttribute('data-source-card-id') || postId || '0', 10) || 0,
+					submission_id: submissionApi.submission_id,
 					layers: layersByPanel,
 				}),
 			})

@@ -155,13 +155,17 @@ When the current post is a **`card_submission`**, the widget resolves panel imag
 
 - Editor UI is rendered by **`templates/frontend/card-panels-editor.php`** and powered by **`assets/js/frontend-panel-editor.js`** (depends on **`fabric`**, **`vce-frontend-panel-renderer`**, and optionally **`vce-debug-client`**). Toolbar: font, size, **text color**, preset swatches, **text background** + clear (**Fabric** `textBackgroundColor`, including per-range selection while editing), bold / italic / underline, filmstrip, **Final review**, **Save submission**, **Save & Send**.
 - **Final review** button is positioned last in the toolbar action group.
-- Unsaved edits are **not** persisted across a full page reload unless the user **saves a submission**.
-- Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`). When the user is logged in, the endpoint finds an existing saved/scheduled submission by the same user + parent card and updates its layers. If none exists, a new **`card_submission`** is created.
-- Returns **`id`** and **`preview_url`** (query-string `/?post_type=card_submission&p=ID`).
+- Unsaved in-browser text (before **Save submission**) is **not** persisted across a full page reload; the toolbar may warn on leave when local draft content exists.
+- **Saved drafts** are stored as **`card_submission`** posts with status meta **`saved`** (or **`scheduled`**). Layers live in **`_vce_submission_layers`**; the virtual card’s panel attachments are never modified.
+- Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`). JSON body: **`parentId`**, **`layers`**, and optional **`submission_id`**. When **`submission_id`** is `0` or omitted, a new **`card_submission`** is created; otherwise the existing post is updated (layers + **`post_modified`**). Response includes **`id`**, **`preview_url`**, **`url`**, and **`edit_url`**.
+- After each successful save, the plugin stores the post ID in user option **`LAST_DRAFT_SUBMISSION_{user_id}`** so the editor can resume the most recently saved draft. Sending email (**`Card_Email_Rest`**) clears that option for the current user.
 - **`_vce_submission_layers`** is a map keyed by panel index (`"0"`, `"1"`, …). Each value holds Fabric **`objects`** plus **`baseW`** / **`baseH`** (editor canvas size when saved) so coordinates scale in preview/submission.
-- Parent virtual card panel attachments and **`_virtual_card_panels`** are not modified by submissions.
-- **Card pages**: when a logged-in user visits a card page, the widget auto-detects any saved/scheduled submission by that user for this card and loads its layers into the editor.
-- **My Submissions (WooCommerce My Account)**: users see a table of their submissions. **Edit** links go to the parent card page (auto-loads saved layers). **View** links go to the submission's public preview (for sent/viewed submissions).
+- **Loading a draft in the editor** (`Card_Panels_Widget::render()`):
+  1. If the URL has **`?id={submission_id}`** (from **My Submissions → Edit**), that submission is loaded.
+  2. Otherwise, if the user has **`LAST_DRAFT_SUBMISSION_{user_id}`**, that submission is loaded.
+  3. The widget temporarily treats the submission as the current post so panel images come from the parent **`virtual_card`** and layers from **`_vce_submission_layers`**.
+- The front-end editor is shown when the loaded submission’s status is **`saved`** or **`scheduled`** and **`vce_can_use_front_editor()`** is true (not only when the queried post is a **`virtual_card`** with the widget’s “enable front editor” setting). **`submission_id`** is passed to JS as **`vcePanelEditor.submissionApi.submission_id`** so subsequent saves update the same post.
+- **My Submissions (WooCommerce My Account**, endpoint **`my-submissions`**, template **`templates/frontend/my-submissions.php`**): logged-in users see a numbered table of their **`card_submission`** posts (by **`_vce_submission_sender_id`**). Status badges: **Saved**, **Scheduled**, **Sent**, **Viewed**. **Edit** (saved/scheduled only) links to the parent virtual card with **`?id={submission_id}`**. **Preview** links open the submission’s front-end view (sent/viewed).
 
 **Final review (editor) and submission view (browser)**
 
@@ -204,8 +208,11 @@ Use the widget on templates where the main queried post is the desired **`virtua
 
 | Route | Method | Role |
 |-------|--------|------|
-| **`/wp-json/vce/v1/submission`** | `POST` | Create **`card_submission`**, store **`_vce_submission_layers`**, return links |
+| **`/wp-json/vce/v1/submission`** | `POST` | Create or update **`card_submission`**; body **`parentId`**, **`layers`**, optional **`submission_id`**; sets status **`saved`**, updates **`LAST_DRAFT_SUBMISSION_{user_id}`** |
+| **`/wp-json/vce/v1/send-email`** | `POST` | Send card email; clears **`LAST_DRAFT_SUBMISSION_{user_id}`** for the sender (see **`Card_Email_Rest`**) |
 | **`/wp-json/vce/v1/debug-client`** | `POST` | Append client log lines when **`VCE_DEBUG`** + admin (see **`Vce_Debug_Rest`**) |
+
+**Submission status meta** (`Panel_Meta::SUBMISSION_STATUS` on **`card_submission`**): **`saved`**, **`scheduled`**, **`sent`**, **`viewed`**. Admin list/meta box and My Submissions use matching labels and colors (including **Scheduled** in **`admin/class-card-submission-meta-box.php`**).
 
 ## File layout
 
@@ -218,7 +225,9 @@ Use the widget on templates where the main queried post is the desired **`virtua
 | `includes/class-editor-access.php` | Who may use the front-end editor (`logged_in` vs `guest` filters) |
 | `includes/class-debug-log.php` | Diagnostic logging + debug client asset registration |
 | `includes/class-vce-debug-rest.php` | REST **`vce/v1/debug-client`** |
-| `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** |
+| `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** (create/update drafts) |
+| `includes/class-card-email-rest.php` | REST **`vce/v1/send-email`** |
+| `admin/class-card-submission-meta-box.php` | Submission status display in admin |
 | `includes/class-template.php` | Template loader |
 | `includes/class-profile-hooks.php` | WooCommerce & UM profile integration hooks |
 | `includes/class-user-account.php` | My Submissions WooCommerce endpoint + shortcode |

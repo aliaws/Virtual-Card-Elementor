@@ -39,6 +39,7 @@ final class Card_Submission_Rest {
 	 */
 	public function save_submission( WP_REST_Request $request ) {
 		$parent_id = absint( $request->get_param( 'parentId' ) );
+        $submission_id = absint( $request->get_param( 'submission_id' ) );
 		if ( $parent_id <= 0 || Post_Type::POST_TYPE !== get_post_type( $parent_id ) ) {
 			return new WP_Error( 'vce_invalid_parent', __( 'Invalid virtual card parent.', VCE_TEXT_DOMAIN ), [ 'status' => 400 ] );
 		}
@@ -66,27 +67,39 @@ final class Card_Submission_Rest {
 
 		$user_id = get_current_user_id();
 
-		$post_id = wp_insert_post(
-			[
-				'post_type'   => Post_Type::CARD_SUBMISSION_POST_TYPE,
-				'post_status' => 'publish',
-				'post_parent' => $parent_id,
-				'post_name'   => sanitize_title( 'submission-' . wp_date( 'Y-m-d-His' ) . '-' . wp_generate_password( 4, false, false ) ),
-				'post_title'  => sprintf(
-					'(VC - %d, Sender - %d)',
-					$parent_id,
-					$user_id ?: 0
-				),
-			],
-			true
-		);
+        if ($submission_id == 0) {
+            $post_id = wp_insert_post(
+                [
+                    'post_type'   => Post_Type::CARD_SUBMISSION_POST_TYPE,
+                    'post_status' => 'publish',
+                    'post_parent' => $parent_id,
+                    'post_name'   => sanitize_title( 'submission-' . wp_date( 'Y-m-d-His' ) . '-' . wp_generate_password( 4, false, false ) ),
+                    'post_title'  => sprintf(
+                        '(VC - %d, Sender - %d)',
+                        $parent_id,
+                        $user_id ?: 0
+                    ),
+                ],
+                true
+            );
+            if ( is_wp_error( $post_id ) ) {
+                return $post_id;
+            }
+        }
+        else {
+            wp_update_post([
+                'ID' => $submission_id,
+                'post_modified' => current_time('mysql'),
+                'post_modified_gmt' => current_time('mysql', 1),
+            ]);
+            $post_id = $submission_id; // TODO Better code
+        }
 
-		if ( is_wp_error( $post_id ) ) {
-			return $post_id;
-		}
 
 		update_post_meta( $post_id, Panel_Meta::SUBMISSION_LAYERS_META_KEY, $decoded );
 		update_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, 'saved' );
+        // save submission so it can be edited
+        update_option("LAST_DRAFT_SUBMISSION_{$user_id}", $post_id);
 
 		if ( $user_id ) {
 			update_post_meta( $post_id, Panel_Meta::SUBMISSION_SENDER_ID, $user_id );

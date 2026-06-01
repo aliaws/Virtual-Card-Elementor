@@ -262,6 +262,29 @@ class Card_Panels_Widget extends Widget_Base {
 	protected function render() {
 		global $post;
 
+        $user_id = get_current_user_id();
+        // 1. Priority: GET id
+        $submission_id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+
+        // 2. Fallback: last draft submission
+        if (!$submission_id) {
+            $submission_id = get_option("LAST_DRAFT_SUBMISSION_{$user_id}");
+        }
+
+        if (!empty($submission_id)) {
+
+            $draft_submission = get_post($submission_id);
+
+            if (
+                $draft_submission &&
+                $draft_submission->post_type === \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE
+            ) {
+                $post = $draft_submission;
+                setup_postdata($post);
+            }
+        }
+
+
 		if ( ! $post ) {
 			return;
 		}
@@ -276,37 +299,6 @@ class Card_Panels_Widget extends Widget_Base {
 			$maybe_saved = get_post_meta( $post->ID, Panel_Meta::SUBMISSION_LAYERS_META_KEY, true );
 			if ( is_array( $maybe_saved ) ) {
 				$saved_layers = $maybe_saved;
-			}
-		}
-
-		// Auto-load saved submission layers for logged-in user on card page.
-		if ( empty( $saved_layers ) && \Virtual_Card_Elementor\Post_Type::POST_TYPE === $post->post_type ) {
-			$user_id = get_current_user_id();
-			if ( $user_id ) {
-				$existing = get_posts(
-					[
-						'post_type'      => \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE,
-						'post_status'    => 'publish',
-						'post_parent'    => $post->ID,
-						'posts_per_page' => 1,
-						'meta_key'       => \Virtual_Card_Elementor\Panel_Meta::SUBMISSION_SENDER_ID,
-						'meta_value'     => $user_id,
-						'meta_query'     => [
-							[
-								'key'     => \Virtual_Card_Elementor\Panel_Meta::SUBMISSION_STATUS,
-								'value'   => [ 'saved', 'scheduled' ],
-								'compare' => 'IN',
-							],
-						],
-						'fields'         => 'ids',
-					]
-				);
-				if ( ! empty( $existing ) ) {
-					$maybe = get_post_meta( (int) $existing[0], \Virtual_Card_Elementor\Panel_Meta::SUBMISSION_LAYERS_META_KEY, true );
-					if ( is_array( $maybe ) ) {
-						$saved_layers = $maybe;
-					}
-				}
 			}
 		}
 
@@ -326,6 +318,7 @@ class Card_Panels_Widget extends Widget_Base {
 		$ids     = array_slice( $ids, 0, $limit );
 		$columns = ! empty( $settings['columns'] ) ? (int) $settings['columns'] : 3;
 		$panels_data = [];
+
 		foreach ( $ids as $aid ) {
 			$aid   = (int) $aid;
 			$large = $aid ? wp_get_attachment_image_src( $aid, 'large' ) : null;
@@ -343,11 +336,17 @@ class Card_Panels_Widget extends Widget_Base {
 			];
 		}
 
+
+
 		$is_submission = \Virtual_Card_Elementor\Post_Type::CARD_SUBMISSION_POST_TYPE === $post->post_type;
 		$editor_on     = ! $is_submission && ! empty( $settings['enable_front_editor'] ) && 'yes' === $settings['enable_front_editor'];
 		$can_edit  = function_exists( 'vce_can_use_front_editor' ) && vce_can_use_front_editor();
+        $status         = get_post_meta( $post->ID, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved';
 
-		if ( $editor_on && $can_edit ) {
+
+
+		if ( ($status == "saved" || $status == "scheduled") && $can_edit ) {
+
 			$font_key = isset( $settings['editor_font_family'] ) ? (string) $settings['editor_font_family'] : 'system';
 
 			wp_enqueue_style( 'vce-frontend-panel-editor' );
@@ -360,6 +359,7 @@ class Card_Panels_Widget extends Widget_Base {
 				'fontStacks'   => self::get_font_stacks_for_js(),
 				'submissionApi' => [
 					'endpoint' => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
+                    'submission_id' => $submission_id,
 					'nonce'    => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
 				],
 				'emailApi' => [
@@ -415,6 +415,7 @@ class Card_Panels_Widget extends Widget_Base {
 		$columns = max( 1, min( 6, $columns ) );
 
 		if ( $is_submission ) {
+
 			wp_enqueue_script( 'fabric' );
 			wp_enqueue_script( 'vce-frontend-panel-submission' );
 			Template::render(

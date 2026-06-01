@@ -79,11 +79,13 @@ class Card_Submission_Meta_Box {
 
 		$status_labels = [
 			'saved'  => __( 'Saved', VCE_TEXT_DOMAIN ),
+            'scheduled'  => __( 'Scheduled', VCE_TEXT_DOMAIN ),
 			'sent'   => __( 'Sent', VCE_TEXT_DOMAIN ),
 			'viewed' => __( 'Viewed', VCE_TEXT_DOMAIN ),
 		];
 		$status_colors = [
 			'saved'  => '#f0ad4e',
+            'scheduled'  => '#6f42c1',
 			'sent'   => '#5bc0de',
 			'viewed' => '#5cb85c',
 		];
