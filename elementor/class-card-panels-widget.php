@@ -106,7 +106,7 @@ class Card_Panels_Widget extends Widget_Base {
 				'label_off'    => __( 'No', VCE_TEXT_DOMAIN ),
 				'return_value' => 'yes',
 				'default'      => 'yes',
-				'description'  => __( 'Toolbar, filmstrip, and draggable text. Drafts are stored in the visitor’s browser only; the virtual card template in the database is not modified.', VCE_TEXT_DOMAIN ),
+				'description'  => __( 'Toolbar, filmstrip, and draggable text. Drafts are stored in the visitor’s browser only; the E-card template in the database is not modified.', VCE_TEXT_DOMAIN ),
 			]
 		);
 

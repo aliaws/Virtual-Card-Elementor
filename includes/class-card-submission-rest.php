@@ -41,7 +41,7 @@ final class Card_Submission_Rest {
 		$parent_id = absint( $request->get_param( 'parentId' ) );
         $submission_id = absint( $request->get_param( 'submission_id' ) );
 		if ( $parent_id <= 0 || Post_Type::POST_TYPE !== get_post_type( $parent_id ) ) {
-			return new WP_Error( 'vce_invalid_parent', __( 'Invalid virtual card parent.', VCE_TEXT_DOMAIN ), [ 'status' => 400 ] );
+			return new WP_Error( 'vce_invalid_parent', __( 'Invalid E-card parent.', VCE_TEXT_DOMAIN ), [ 'status' => 400 ] );
 		}
 
 		$layers = $request->get_param( 'layers' );

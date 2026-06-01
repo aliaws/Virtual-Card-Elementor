@@ -398,10 +398,36 @@
 	text-decoration: underline;
 }
 
-/* Stage */
-.vce-panel-editor__stage-outer {
-	margin-bottom: 16px;
+/* Workspace: filmstrip (left) + stage (right) */
+.vce-panel-editor__workspace {
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	justify-content: flex-start;
+	gap: clamp(12px, 2.5vw, 24px);
+	margin: 12px 0 16px;
+	width: 100%;
+	min-width: 0;
 }
+
+.vce-panel-editor__filmstrip-wrap {
+	flex: 0 0 auto;
+	align-self: flex-start;
+	width: max-content;
+	max-width: 100%;
+	min-width: 0;
+	margin: 0;
+}
+
+.vce-panel-editor__stage-outer {
+	flex: 1 1 0;
+	min-width: 0;
+	width: 100%;
+	margin: 0;
+	align-self: stretch;
+}
+
+/* Stage */
 
 .vce-panel-editor__stage {
 	background: #fff;
@@ -439,10 +465,6 @@
 }
 
 /* Filmstrip */
-.vce-panel-editor__filmstrip-wrap {
-	margin-top: 8px;
-}
-
 .vce-panel-editor__filmstrip-title {
 	margin: 0 0 8px;
 	font-size: 11px;
@@ -450,21 +472,26 @@
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: #646970;
+	text-align: left;
 }
 
 .vce-panel-editor__filmstrip {
 	display: flex;
+	flex-direction: column;
 	flex-wrap: nowrap;
+	align-items: stretch;
 	gap: 10px;
 	list-style: none;
 	margin: 0;
 	padding: 10px 8px;
-	overflow-x: auto;
+	overflow-x: hidden;
+	overflow-y: auto;
+	max-height: min(84vh, 900px);
 	-webkit-overflow-scrolling: touch;
 	border: 1px solid var(--vce-editor-border);
 	border-radius: var(--vce-editor-radius);
 	background: #fff;
-	scroll-snap-type: x proximity;
+	scroll-snap-type: y proximity;
 }
 
 .vce-panel-editor__filmstrip li {
@@ -739,6 +766,40 @@
 	box-shadow: none;
 }
 
+@media (max-width: 900px) {
+	.vce-panel-editor__workspace {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 12px;
+	}
+
+	.vce-panel-editor__filmstrip-wrap {
+		width: 100%;
+		max-width: none;
+		order: 1;
+	}
+
+	.vce-panel-editor__stage-outer {
+		order: 2;
+		flex: 1 1 auto;
+	}
+
+	.vce-panel-editor__filmstrip {
+		flex-direction: row;
+		flex-wrap: nowrap;
+		align-items: center;
+		overflow-x: auto;
+		overflow-y: hidden;
+		max-height: none;
+		width: 100%;
+		scroll-snap-type: x proximity;
+	}
+
+	.vce-panel-editor__filmstrip li {
+		scroll-snap-align: center;
+	}
+}
+
 @media (max-width: 600px) {
 	.vce-panel-editor__toolbar-main {
 		padding: 10px 12px 12px;
@@ -751,6 +812,11 @@
 
 	.vce-panel-editor__field-label {
 		display: none;
+	}
+
+	.vce-panel-editor__thumb img {
+		width: 64px;
+		height: 64px;
 	}
 }
 

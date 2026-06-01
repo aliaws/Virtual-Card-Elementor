@@ -210,36 +210,38 @@ if ( false === $saved_json ) {
 		</div>
 	</div>
 
-	<div class="vce-panel-editor__stage-outer">
-		<div class="vce-panel-editor__stage" data-vce-stage>
-			<div class="vce-panel-editor__stage-inner" data-vce-stage-inner>
-				<div class="vce-panel-editor__canvas-wrap" data-vce-canvas-wrap>
-					<canvas class="vce-panel-editor__fabric" data-vce-fabric-canvas width="800" height="600"></canvas>
+	<div class="vce-panel-editor__workspace">
+		<div class="vce-panel-editor__filmstrip-wrap">
+			<p class="vce-panel-editor__filmstrip-title"><?php esc_html_e( 'Panels', VCE_TEXT_DOMAIN ); ?></p>
+			<ul class="vce-panel-editor__filmstrip" data-vce-filmstrip>
+				<?php foreach ( $panels_data as $index => $p ) : ?>
+					<li>
+						<button
+							type="button"
+							class="vce-panel-editor__thumb<?php echo 0 === (int) $index ? ' is-active' : ''; ?>"
+							data-vce-thumb
+							data-index="<?php echo esc_attr( (string) $index ); ?>"
+							aria-label="<?php echo esc_attr( sprintf( /* translators: %d: panel number */ __( 'Panel %d', VCE_TEXT_DOMAIN ), (int) $index + 1 ) ); ?>"
+							aria-pressed="<?php echo 0 === (int) $index ? 'true' : 'false'; ?>"
+						>
+							<?php if ( ! empty( $p['thumb'] ) ) : ?>
+								<img src="<?php echo esc_url( $p['thumb'] ); ?>" alt="" width="80" height="80" loading="lazy" />
+							<?php endif; ?>
+						</button>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+
+		<div class="vce-panel-editor__stage-outer">
+			<div class="vce-panel-editor__stage" data-vce-stage>
+				<div class="vce-panel-editor__stage-inner" data-vce-stage-inner>
+					<div class="vce-panel-editor__canvas-wrap" data-vce-canvas-wrap>
+						<canvas class="vce-panel-editor__fabric" data-vce-fabric-canvas width="800" height="600"></canvas>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
-
-	<div class="vce-panel-editor__filmstrip-wrap">
-		<p class="vce-panel-editor__filmstrip-title"><?php esc_html_e( 'Panels', VCE_TEXT_DOMAIN ); ?></p>
-		<ul class="vce-panel-editor__filmstrip" data-vce-filmstrip>
-			<?php foreach ( $panels_data as $index => $p ) : ?>
-				<li>
-					<button
-						type="button"
-						class="vce-panel-editor__thumb<?php echo 0 === (int) $index ? ' is-active' : ''; ?>"
-						data-vce-thumb
-						data-index="<?php echo esc_attr( (string) $index ); ?>"
-						aria-label="<?php echo esc_attr( sprintf( /* translators: %d: panel number */ __( 'Panel %d', VCE_TEXT_DOMAIN ), (int) $index + 1 ) ); ?>"
-						aria-pressed="<?php echo 0 === (int) $index ? 'true' : 'false'; ?>"
-					>
-						<?php if ( ! empty( $p['thumb'] ) ) : ?>
-							<img src="<?php echo esc_url( $p['thumb'] ); ?>" alt="" width="80" height="80" loading="lazy" />
-						<?php endif; ?>
-					</button>
-				</li>
-			<?php endforeach; ?>
-		</ul>
 	</div>
 
 	<div class="vce-preview-modal vce-preview-modal--fullpage" data-vce-preview-modal hidden>
