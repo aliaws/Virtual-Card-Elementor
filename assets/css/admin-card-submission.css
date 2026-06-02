@@ -2,49 +2,104 @@
  * Admin: card submission list table, filters, send modal.
  */
 
-.post-type-card_submission .tablenav .actions .vce-submission-filters {
-	display: inline-flex;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: 6px;
-	margin: 0 8px 0 0;
-	vertical-align: middle;
+/* —— List table: fit viewport, no forced horizontal scroll —— */
+.post-type-card_submission table.wp-list-table.widefat {
+	table-layout: fixed;
+	width: 100%;
+	border-collapse: collapse;
 }
 
-.post-type-card_submission .tablenav .actions .vce-list-filter-select {
-	max-width: 220px;
-	width: auto;
-	min-width: 140px;
-	vertical-align: middle;
-	margin: 0;
+.post-type-card_submission table.wp-list-table th,
+.post-type-card_submission table.wp-list-table td {
+	vertical-align: top;
+	word-break: normal;
+	overflow-wrap: break-word;
 }
 
-.post-type-card_submission .wp-list-table .column-vce_preview_link {
-	width: 120px;
+/* Hide any AIOSEO / SEO plugin columns that slip through */
+.post-type-card_submission table.wp-list-table th[class*="aioseo"],
+.post-type-card_submission table.wp-list-table td[class*="aioseo"],
+.post-type-card_submission table.wp-list-table th.column-aioseo-details,
+.post-type-card_submission table.wp-list-table td.column-aioseo-details {
+	display: none !important;
 }
 
-.post-type-card_submission .wp-list-table .column-vce_status {
-	width: 110px;
+.post-type-card_submission table.wp-list-table .column-cb {
+	width: 2.2em;
 }
 
-.post-type-card_submission .wp-list-table .column-vce_parent_card {
+.post-type-card_submission table.wp-list-table .column-title {
+	width: 16%;
+}
+
+.post-type-card_submission table.wp-list-table .column-title .row-title {
+	display: block;
+	line-height: 1.35;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.post-type-card_submission table.wp-list-table .column-title .post-state,
+.post-type-card_submission table.wp-list-table .column-title .description,
+.post-type-card_submission table.wp-list-table .column-title p {
+	display: none !important;
+}
+
+.post-type-card_submission table.wp-list-table .column-title .row-actions {
+	display: block;
+	margin-top: 4px;
+	line-height: 1.4;
+	font-size: 12px;
+}
+
+.post-type-card_submission table.wp-list-table .column-vce_parent_card {
 	width: 14%;
 }
 
-.post-type-card_submission .wp-list-table .column-vce_sender {
-	width: 12%;
+.post-type-card_submission table.wp-list-table .column-vce_parent_card a {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.post-type-card_submission .wp-list-table .column-vce_receiver_email {
+.post-type-card_submission table.wp-list-table .column-vce_sender {
+	width: 11%;
+}
+
+.post-type-card_submission table.wp-list-table .column-vce_sender,
+.post-type-card_submission table.wp-list-table .column-vce_preview_link,
+.post-type-card_submission table.wp-list-table .column-vce_status {
+	white-space: nowrap;
+}
+
+.post-type-card_submission table.wp-list-table .column-vce_receiver_email {
 	width: 16%;
+}
+
+.post-type-card_submission table.wp-list-table .column-vce_receiver_email .vce-receiver-email {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.post-type-card_submission table.wp-list-table .column-vce_status {
+	width: 9%;
+}
+
+.post-type-card_submission table.wp-list-table .column-vce_preview_link {
+	width: 8%;
+}
+
+.post-type-card_submission table.wp-list-table .column-date {
+	width: 14%;
+	white-space: nowrap;
 }
 
 .post-type-card_submission .vce-submission-empty {
 	color: #a7aaad;
-}
-
-.post-type-card_submission .vce-receiver-email {
-	word-break: break-all;
 }
 
 .post-type-card_submission .vce-status-badge {
@@ -62,6 +117,34 @@
 	font-weight: 500;
 }
 
+/* —— Filters —— */
+.post-type-card_submission .tablenav .actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.post-type-card_submission .tablenav .actions .vce-submission-filters {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	vertical-align: middle;
+}
+
+.post-type-card_submission .tablenav .actions .vce-list-filter-select {
+	width: auto;
+	min-width: 140px;
+	max-width: 200px;
+	height: 30px;
+	line-height: 2;
+	vertical-align: middle;
+	margin: 0;
+}
+
+/* —— Meta box parent picker —— */
 .vce-parent-virtual-card-picker {
 	margin: 0;
 }
@@ -70,6 +153,7 @@
 	margin-bottom: 8px;
 }
 
+/* —— Send modal —— */
 .vce-send-modal {
 	position: fixed;
 	inset: 0;

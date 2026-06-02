@@ -20,11 +20,25 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Card_Submission_Admin {
 
+	/** @var string[] Allowed list-table column keys (order preserved). */
+	private const LIST_COLUMNS = [
+		'cb',
+		'title',
+		'vce_parent_card',
+		'vce_sender',
+		'vce_receiver_email',
+		'vce_status',
+		'vce_preview_link',
+		'date',
+	];
+
 	/**
 	 * Register hooks.
 	 */
 	public function register_hooks(): void {
-		add_filter( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_columns', [ $this, 'columns' ] );
+		add_filter( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_columns', [ $this, 'columns' ], 5 );
+		add_filter( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_columns', [ $this, 'strip_unwanted_columns' ], 999 );
+		add_filter( 'the_title', [ $this, 'filter_submission_list_title' ], 10, 2 );
 		add_action( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_custom_column', [ $this, 'column_content' ], 10, 2 );
 		add_filter( 'manage_edit-' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_sortable_columns', [ $this, 'sortable_columns' ] );
 		add_action( 'restrict_manage_posts', [ $this, 'render_list_filters' ], 10, 2 );
@@ -85,7 +99,7 @@ class Card_Submission_Admin {
 			$new['cb'] = $columns['cb'];
 		}
 		if ( isset( $columns['title'] ) ) {
-			$new['title'] = $columns['title'];
+			$new['title'] = __( 'Submission', VCE_TEXT_DOMAIN );
 		}
 		$new['vce_parent_card']     = __( 'Virtual card', VCE_TEXT_DOMAIN );
 		$new['vce_sender']           = __( 'Sender', VCE_TEXT_DOMAIN );
@@ -96,6 +110,67 @@ class Card_Submission_Admin {
 			$new['date'] = $columns['date'];
 		}
 		return $new;
+	}
+
+	/**
+	 * Remove third-party columns (e.g. AIOSEO Details) added after our column filter.
+	 *
+	 * @param string[] $columns Column headers.
+	 * @return string[]
+	 */
+	public function strip_unwanted_columns( array $columns ): array {
+		$ordered = [];
+		foreach ( self::LIST_COLUMNS as $key ) {
+			if ( isset( $columns[ $key ] ) ) {
+				$ordered[ $key ] = $columns[ $key ];
+			}
+		}
+		return $ordered;
+	}
+
+	/**
+	 * Shorter, readable label in the Submission column (replaces auto post title).
+	 *
+	 * @param string $title   Post title.
+	 * @param int    $post_id Post ID.
+	 */
+	public function filter_submission_list_title( string $title, int $post_id = 0 ): string {
+		if ( ! is_admin() || $post_id <= 0 || Post_Type::CARD_SUBMISSION_POST_TYPE !== get_post_type( $post_id ) ) {
+			return $title;
+		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-card_submission' !== $screen->id ) {
+			return $title;
+		}
+		return $this->get_submission_list_label( $post_id );
+	}
+
+	/**
+	 * @param int $post_id Submission post ID.
+	 */
+	private function get_submission_list_label( int $post_id ): string {
+		$parent_id    = (int) wp_get_post_parent_id( $post_id );
+		$parent_title = $parent_id ? get_the_title( $parent_id ) : '';
+		$receiver     = (string) get_post_meta( $post_id, Panel_Meta::SUBMISSION_RECEIVER_EMAIL, true );
+
+		if ( $parent_title && $receiver ) {
+			return sprintf(
+				'%s → %s',
+				$parent_title,
+				$receiver
+			);
+		}
+		if ( $parent_title ) {
+			return $parent_title;
+		}
+		if ( $receiver ) {
+			return $receiver;
+		}
+		return sprintf(
+			/* translators: %d: submission post ID */
+			__( 'Submission #%d', VCE_TEXT_DOMAIN ),
+			$post_id
+		);
 	}
 
 	/**
@@ -414,6 +489,7 @@ class Card_Submission_Admin {
 			[],
 			vce_asset_version( 'assets/css/admin-card-submission.css' )
 		);
+
 
 		if ( in_array( $hook_suffix, [ 'post.php', 'post-new.php' ], true ) ) {
 			$this->enqueue_parent_picker_script();
