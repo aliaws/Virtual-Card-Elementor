@@ -63,7 +63,12 @@ public const SUBMISSION_SENDER_ID = '_vce_sender_id';
 public const SUBMISSION_RECEIVER_EMAIL = '_vce_receiver_email';
 
 /**
- * Submission status: saved, sent, viewed.
+ * Scheduled send datetime (MySQL format, site timezone). Empty when sending immediately.
+ */
+public const SUBMISSION_SCHEDULED_AT = '_vce_scheduled_at';
+
+/**
+ * Submission status: saved, scheduled, sent, viewed.
  */
 public const SUBMISSION_STATUS = '_vce_submission_status';
 

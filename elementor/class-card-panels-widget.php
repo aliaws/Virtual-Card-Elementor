@@ -355,16 +355,26 @@ class Card_Panels_Widget extends Widget_Base {
 
 			self::enqueue_editor_google_font( $font_key );
 
+			$current_user    = wp_get_current_user();
 			$editor_localize = [
 				'defaultFont'  => $font_key,
 				'fontStacks'   => self::get_font_stacks_for_js(),
+				'currentUser'  => [
+					'displayName' => is_user_logged_in() ? ( $current_user->display_name ?: $current_user->user_login ) : '',
+				],
 				'submissionApi' => [
 					'endpoint'      => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
 					'submission_id' => $submission_id,
 					'nonce'         => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
 				],
+				'ajaxUrl'          => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
+				'recipientAjax'    => [
+					'action' => 'vce_recipient_emails',
+					'nonce'  => is_user_logged_in() ? wp_create_nonce( 'vce_recipient_emails' ) : '',
+				],
 				'emailApi' => [
-					'endpoint' => esc_url_raw( rest_url( 'vce/v1/send-email' ) ),
+					'endpoint'          => esc_url_raw( rest_url( 'vce/v1/send-email' ) ),
+					'recipientEndpoint' => esc_url_raw( rest_url( 'vce/v1/recipient-emails' ) ),
 				],
 				'i18n'         => [
 					'defaultText'         => __( 'Your text', VCE_TEXT_DOMAIN ),
@@ -382,12 +392,15 @@ class Card_Panels_Widget extends Widget_Base {
 						'You have text on this card that is only saved in this browser. Leave anyway?',
 						VCE_TEXT_DOMAIN
 					),
-					'sendEmail'           => __( 'Send', VCE_TEXT_DOMAIN ),
+					'sendEmail'           => __( 'Schedule or Send', VCE_TEXT_DOMAIN ),
 					'emailSent'           => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
+					'scheduledSuccess'    => __( 'E-Card scheduled successfully!', VCE_TEXT_DOMAIN ),
 					'emailFailed'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
 					'recipientRequired'   => __( 'Please enter a recipient email.', VCE_TEXT_DOMAIN ),
+					'scheduleRequired'    => __( 'Please choose a future date and time.', VCE_TEXT_DOMAIN ),
 					'preparingPreview'    => __( 'Building preview...', VCE_TEXT_DOMAIN ),
 					'sendingEmail'        => __( 'Sending...', VCE_TEXT_DOMAIN ),
+					'scheduling'          => __( 'Scheduling...', VCE_TEXT_DOMAIN ),
 				],
 			];
 			if ( \Virtual_Card_Elementor\Debug_Log::vce_debug_client_enabled() ) {

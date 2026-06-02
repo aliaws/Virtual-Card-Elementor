@@ -1,0 +1,138 @@
+/**
+ * Admin: card submission list table, filters, send modal.
+ */
+
+.post-type-card_submission .tablenav .actions .vce-submission-filters {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin: 0 8px 0 0;
+	vertical-align: middle;
+}
+
+.post-type-card_submission .tablenav .actions .vce-list-filter-select {
+	max-width: 220px;
+	width: auto;
+	min-width: 140px;
+	vertical-align: middle;
+	margin: 0;
+}
+
+.post-type-card_submission .wp-list-table .column-vce_preview_link {
+	width: 120px;
+}
+
+.post-type-card_submission .wp-list-table .column-vce_status {
+	width: 110px;
+}
+
+.post-type-card_submission .wp-list-table .column-vce_parent_card {
+	width: 14%;
+}
+
+.post-type-card_submission .wp-list-table .column-vce_sender {
+	width: 12%;
+}
+
+.post-type-card_submission .wp-list-table .column-vce_receiver_email {
+	width: 16%;
+}
+
+.post-type-card_submission .vce-submission-empty {
+	color: #a7aaad;
+}
+
+.post-type-card_submission .vce-receiver-email {
+	word-break: break-all;
+}
+
+.post-type-card_submission .vce-status-badge {
+	display: inline-block;
+	padding: 2px 10px;
+	border-radius: 10px;
+	color: #fff;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.4;
+	white-space: nowrap;
+}
+
+.post-type-card_submission .vce-preview-link {
+	font-weight: 500;
+}
+
+.vce-parent-virtual-card-picker {
+	margin: 0;
+}
+
+.vce-parent-virtual-card-picker .vce-virtual-card-parent-filter {
+	margin-bottom: 8px;
+}
+
+.vce-send-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 48px 16px;
+	box-sizing: border-box;
+}
+
+.vce-send-modal[hidden] {
+	display: none !important;
+}
+
+.vce-send-modal__backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
+}
+
+.vce-send-modal__dialog {
+	position: relative;
+	z-index: 1;
+	background: #fff;
+	width: 100%;
+	max-width: 450px;
+	padding: 24px;
+	border-radius: 8px;
+	box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+}
+
+.vce-send-modal__title {
+	margin: 0 0 16px;
+	font-size: 1.2em;
+}
+
+.vce-send-modal__field {
+	margin: 0 0 12px;
+}
+
+.vce-send-modal__field label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.vce-send-modal__actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 4px;
+}
+
+.vce-send-modal__status {
+	margin: 8px 0 0;
+	font-size: 13px;
+}
+
+.vce-send-modal__status.is-error {
+	color: #d63638;
+}
+
+.vce-send-modal__status.is-success {
+	color: #00a32a;
+}

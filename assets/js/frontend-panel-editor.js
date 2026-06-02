@@ -158,12 +158,17 @@
 		var btnSaveSubmission = root.querySelector('[data-vce-save-submission]');
 		var btnSaveSend = root.querySelector('[data-vce-save-send]');
 		var emailForm = root.querySelector('[data-vce-email-form]');
+		var sendModeSelect = root.querySelector('[data-vce-send-mode]');
+		var scheduleField = root.querySelector('[data-vce-schedule-field]');
+		var scheduledAtInput = root.querySelector('[data-vce-scheduled-at]');
 		var recipientInput = root.querySelector('[data-vce-recipient-email]');
+		var recipientSuggestions = root.querySelector('[data-vce-recipient-suggestions]');
 		var senderInput = root.querySelector('[data-vce-sender-name]');
 		var messageInput = root.querySelector('[data-vce-send-message]');
 		var sendBtn = root.querySelector('[data-vce-send-email]');
 		var cancelBtn = root.querySelector('[data-vce-cancel-email]');
 		var emailStatus = root.querySelector('[data-vce-email-status]');
+		var recipientFetchTimer = null;
 		var submissionLink = root.querySelector('[data-vce-submission-link]');
 		var inputSize = root.querySelector('[data-vce-font-size]');
 		var inputColor = root.querySelector('[data-vce-text-color]');
@@ -956,12 +961,167 @@
 				});
 		}
 
+		function setScheduleMinDatetime() {
+			if (!scheduledAtInput) {
+				return;
+			}
+			var now = new Date();
+			now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+			scheduledAtInput.min = now.toISOString().slice(0, 16);
+		}
+
+		function syncSendModeFields() {
+			var isSchedule = sendModeSelect && sendModeSelect.value === 'schedule';
+			if (scheduleField) {
+				if (isSchedule) {
+					scheduleField.removeAttribute('hidden');
+				} else {
+					scheduleField.setAttribute('hidden', 'hidden');
+				}
+			}
+			if (scheduledAtInput) {
+				scheduledAtInput.required = !!isSchedule;
+				if (!isSchedule) {
+					scheduledAtInput.value = '';
+				}
+			}
+		}
+
+		function hideRecipientSuggestions() {
+			if (!recipientSuggestions) {
+				return;
+			}
+			recipientSuggestions.innerHTML = '';
+			recipientSuggestions.classList.remove('is-open');
+			recipientSuggestions.setAttribute('aria-hidden', 'true');
+			if (recipientInput) {
+				recipientInput.setAttribute('aria-expanded', 'false');
+			}
+		}
+
+		function showRecipientSuggestions(emails) {
+			if (!recipientSuggestions || !recipientInput) {
+				return;
+			}
+			recipientSuggestions.innerHTML = '';
+			if (!emails || !emails.length) {
+				hideRecipientSuggestions();
+				return;
+			}
+			emails.forEach(function (email) {
+				var li = document.createElement('li');
+				li.setAttribute('role', 'option');
+				var btn = document.createElement('button');
+				btn.type = 'button';
+				btn.textContent = email;
+				btn.addEventListener('mousedown', function (e) {
+					e.preventDefault();
+					recipientInput.value = email;
+					hideRecipientSuggestions();
+				});
+				li.appendChild(btn);
+				recipientSuggestions.appendChild(li);
+			});
+			recipientSuggestions.classList.add('is-open');
+			recipientSuggestions.setAttribute('aria-hidden', 'false');
+			recipientInput.setAttribute('aria-expanded', 'true');
+		}
+
+		function parseRecipientEmailList(data) {
+			if (Array.isArray(data)) {
+				return data;
+			}
+			if (data && Array.isArray(data.data)) {
+				return data.data;
+			}
+			return [];
+		}
+
+		function fetchRecipientSuggestions(query) {
+			var recipientAjax = cfg.recipientAjax || {};
+			var ajaxUrl = cfg.ajaxUrl || (typeof window.ajaxurl !== 'undefined' ? window.ajaxurl : '');
+
+			if (ajaxUrl && recipientAjax.action && recipientAjax.nonce) {
+				var body = new URLSearchParams();
+				body.append('action', recipientAjax.action);
+				body.append('nonce', recipientAjax.nonce);
+				body.append('search', query || '');
+				fetch(ajaxUrl, {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					body: body.toString(),
+				})
+					.then(function (res) {
+						return res.json();
+					})
+					.then(function (data) {
+						if (data && data.success) {
+							showRecipientSuggestions(parseRecipientEmailList(data.data));
+						} else {
+							hideRecipientSuggestions();
+						}
+					})
+					.catch(function () {
+						hideRecipientSuggestions();
+					});
+				return;
+			}
+
+			if (!emailApi.recipientEndpoint || !submissionApi.nonce) {
+				return;
+			}
+			var url = emailApi.recipientEndpoint + '?search=' + encodeURIComponent(query || '');
+			var headers = { 'X-WP-Nonce': submissionApi.nonce };
+			fetch(url, {
+				method: 'GET',
+				headers: headers,
+				credentials: 'same-origin',
+			})
+				.then(function (res) {
+					return res.json().then(function (data) {
+						return { ok: res.ok, data: data };
+					});
+				})
+				.then(function (result) {
+					if (!result.ok) {
+						hideRecipientSuggestions();
+						return;
+					}
+					showRecipientSuggestions(parseRecipientEmailList(result.data));
+				})
+				.catch(function () {
+					hideRecipientSuggestions();
+				});
+		}
+
+		function debouncedRecipientSearch() {
+			if (!recipientInput) {
+				return;
+			}
+			if (recipientFetchTimer) {
+				clearTimeout(recipientFetchTimer);
+			}
+			recipientFetchTimer = setTimeout(function () {
+				fetchRecipientSuggestions(recipientInput.value.trim());
+			}, 250);
+		}
+
 		function showEmailForm() {
 			if (emailForm) {
 				emailForm.removeAttribute('hidden');
 			}
+			if (sendModeSelect) {
+				sendModeSelect.value = 'now';
+			}
+			syncSendModeFields();
+			setScheduleMinDatetime();
+			if (senderInput && cfg.currentUser && cfg.currentUser.displayName) {
+				senderInput.value = cfg.currentUser.displayName;
+			}
 			if (recipientInput) {
 				recipientInput.focus();
+				fetchRecipientSuggestions('');
 			}
 		}
 
@@ -978,6 +1138,14 @@
 			if (messageInput) {
 				messageInput.value = '';
 			}
+			if (sendModeSelect) {
+				sendModeSelect.value = 'now';
+			}
+			if (scheduledAtInput) {
+				scheduledAtInput.value = '';
+			}
+			syncSendModeFields();
+			hideRecipientSuggestions();
 			if (emailStatus) {
 				emailStatus.setAttribute('hidden', 'hidden');
 			}
@@ -998,9 +1166,24 @@
 				return;
 			}
 
+			var isSchedule = sendModeSelect && sendModeSelect.value === 'schedule';
+			if (isSchedule) {
+				if (!scheduledAtInput || !scheduledAtInput.value) {
+					setEmailStatus(i18n.scheduleRequired || 'Please choose a future date and time.', true);
+					return;
+				}
+				var scheduledTs = new Date(scheduledAtInput.value).getTime();
+				if (!scheduledTs || scheduledTs <= Date.now()) {
+					setEmailStatus(i18n.scheduleRequired || 'Please choose a future date and time.', true);
+					return;
+				}
+			}
+
 			saveCurrentPanelObjects();
 			sendBtn.disabled = true;
-			sendBtn.textContent = i18n.savingSubmission || 'Saving...';
+			sendBtn.textContent = isSchedule
+				? (i18n.scheduling || 'Scheduling...')
+				: (i18n.savingSubmission || 'Saving...');
 			setEmailStatus('');
 
 			var headers = { 'Content-Type': 'application/json' };
@@ -1008,15 +1191,23 @@
 				headers['X-WP-Nonce'] = submissionApi.nonce;
 			}
 
+			var saveBody = {
+				parentId: parseInt(root.getAttribute('data-source-card-id') || postId || '0', 10) || 0,
+				submission_id: submissionApi.submission_id,
+				layers: layersByPanel,
+				dispatch: true,
+				recipientEmail: recipientInput.value.trim(),
+				sendMode: isSchedule ? 'schedule' : 'now',
+			};
+			if (isSchedule && scheduledAtInput) {
+				saveBody.scheduledAt = scheduledAtInput.value;
+			}
+
 			fetch(submissionApi.endpoint, {
 				method: 'POST',
 				headers: headers,
 				credentials: 'same-origin',
-				body: JSON.stringify({
-					parentId: parseInt(root.getAttribute('data-source-card-id') || postId || '0', 10) || 0,
-					submission_id: submissionApi.submission_id,
-					layers: layersByPanel,
-				}),
+				body: JSON.stringify(saveBody),
 			})
 				.then(function (res) {
 					return res.json().then(function (data) {
@@ -1029,6 +1220,10 @@
 					}
 					if (result.data.id) {
 						submissionApi.submission_id = result.data.id;
+					}
+
+					if (isSchedule) {
+						return { scheduled: true, submission: result.data };
 					}
 
 					setEmailStatus(i18n.preparingPreview || 'Building preview...');
@@ -1044,6 +1239,10 @@
 					});
 				})
 				.then(function (data) {
+					if (data && data.scheduled) {
+						return { scheduled: true };
+					}
+
 					setEmailStatus(i18n.sendingEmail || 'Sending...');
 
 					var emailHeaders = { 'Content-Type': 'application/json' };
@@ -1072,6 +1271,11 @@
 					});
 				})
 				.then(function (result) {
+					if (result && result.scheduled) {
+						markSyncedWithServer();
+						setEmailStatus(i18n.scheduledSuccess || 'E-Card scheduled successfully!');
+						return;
+					}
 					if (!result.ok) {
 						throw new Error('email_failed');
 					}
@@ -1084,7 +1288,7 @@
 				})
 				.finally(function () {
 					sendBtn.disabled = false;
-					sendBtn.textContent = i18n.sendEmail || 'Send';
+					sendBtn.textContent = i18n.sendEmail || 'Schedule or Send';
 				});
 		}
 
@@ -1124,6 +1328,29 @@
 		if (cancelBtn) {
 			cancelBtn.addEventListener('click', hideEmailForm);
 		}
+		if (sendModeSelect) {
+			sendModeSelect.addEventListener('change', syncSendModeFields);
+		}
+		if (recipientSuggestions) {
+			recipientSuggestions.addEventListener('mousedown', function (e) {
+				e.preventDefault();
+			});
+		}
+		if (recipientInput) {
+			recipientInput.addEventListener('input', debouncedRecipientSearch);
+			recipientInput.addEventListener('focus', debouncedRecipientSearch);
+			recipientInput.addEventListener('blur', function () {
+				setTimeout(hideRecipientSuggestions, 200);
+			});
+		}
+		document.addEventListener('click', function (e) {
+			if (!recipientSuggestions || !recipientInput) {
+				return;
+			}
+			if (!recipientSuggestions.contains(e.target) && e.target !== recipientInput) {
+				hideRecipientSuggestions();
+			}
+		});
 		if (inputSize) {
 			inputSize.addEventListener('input', function () {
 				updateSizeReadout();

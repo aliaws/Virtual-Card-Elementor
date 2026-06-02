@@ -51,7 +51,7 @@ if ( false === $saved_json ) {
 						<?php esc_html_e( 'Save submission', VCE_TEXT_DOMAIN ); ?>
 					</button>
 					<button type="button" class="button button-secondary vce-panel-editor__btn" data-vce-save-send>
-						<?php esc_html_e( 'Save & Send', VCE_TEXT_DOMAIN ); ?>
+						<?php esc_html_e( 'Schedule or Send', VCE_TEXT_DOMAIN ); ?>
 					</button>
 					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
 						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
@@ -191,8 +191,32 @@ if ( false === $saved_json ) {
 	<div class="vce-email-form" data-vce-email-form hidden>
 		<div class="vce-email-form__inner">
 			<p class="vce-email-form__field">
+				<label for="vce-send-mode"><?php esc_html_e( 'When to send', VCE_TEXT_DOMAIN ); ?></label>
+				<select id="vce-send-mode" data-vce-send-mode class="widefat">
+					<option value="now"><?php esc_html_e( 'Now', VCE_TEXT_DOMAIN ); ?></option>
+					<option value="schedule"><?php esc_html_e( 'Schedule', VCE_TEXT_DOMAIN ); ?></option>
+				</select>
+			</p>
+			<p class="vce-email-form__field vce-email-form__field--schedule" data-vce-schedule-field hidden>
+				<label for="vce-scheduled-at"><?php esc_html_e( 'Schedule date & time', VCE_TEXT_DOMAIN ); ?> *</label>
+				<input type="datetime-local" id="vce-scheduled-at" data-vce-scheduled-at class="widefat" />
+			</p>
+			<p class="vce-email-form__field vce-email-form__field--recipient">
 				<label for="vce-recipient-email"><?php esc_html_e( 'Recipient Email', VCE_TEXT_DOMAIN ); ?> *</label>
-				<input type="email" id="vce-recipient-email" data-vce-recipient-email class="widefat" required />
+				<span class="vce-email-form__autocomplete">
+					<input
+						type="email"
+						id="vce-recipient-email"
+						data-vce-recipient-email
+						class="widefat"
+						required
+						autocomplete="off"
+						aria-autocomplete="list"
+						aria-controls="vce-recipient-suggestions"
+						aria-expanded="false"
+					/>
+					<ul id="vce-recipient-suggestions" class="vce-email-form__suggestions" data-vce-recipient-suggestions role="listbox" aria-hidden="true"></ul>
+				</span>
 			</p>
 			<p class="vce-email-form__field">
 				<label for="vce-sender-name"><?php esc_html_e( 'Your Name', VCE_TEXT_DOMAIN ); ?></label>
@@ -203,7 +227,7 @@ if ( false === $saved_json ) {
 				<textarea id="vce-send-message" data-vce-send-message class="widefat" rows="3"></textarea>
 			</p>
 			<div class="vce-email-form__actions">
-				<button type="button" class="button button-primary" data-vce-send-email><?php esc_html_e( 'Send', VCE_TEXT_DOMAIN ); ?></button>
+				<button type="button" class="button button-primary" data-vce-send-email><?php esc_html_e( 'Schedule or Send', VCE_TEXT_DOMAIN ); ?></button>
 				<button type="button" class="button" data-vce-cancel-email><?php esc_html_e( 'Cancel', VCE_TEXT_DOMAIN ); ?></button>
 			</div>
 			<p class="vce-email-form__status" data-vce-email-status hidden></p>

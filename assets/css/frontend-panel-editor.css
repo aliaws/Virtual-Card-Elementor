@@ -826,6 +826,12 @@
 	border-radius: var(--vce-editor-radius);
 	padding: 16px;
 	margin: 12px 0;
+	overflow: visible;
+}
+
+.vce-email-form__inner {
+	overflow: visible;
+	position: relative;
 }
 
 .vce-email-form__field {
@@ -848,4 +854,51 @@
 .vce-email-form__status {
 	margin: 8px 0 0;
 	font-size: 13px;
+}
+
+.vce-email-form__autocomplete {
+	position: relative;
+	display: block;
+}
+
+.vce-email-form__suggestions {
+	display: none;
+	position: absolute;
+	z-index: 10050;
+	left: 0;
+	right: 0;
+	top: 100%;
+	margin: 2px 0 0;
+	padding: 0;
+	list-style: none;
+	background: #fff;
+	border: 1px solid var(--vce-editor-border, #c3c4c7);
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.vce-email-form__suggestions.is-open {
+	display: block;
+}
+
+.vce-email-form__suggestions li {
+	margin: 0;
+}
+
+.vce-email-form__suggestions button {
+	display: block;
+	width: 100%;
+	padding: 8px 12px;
+	border: 0;
+	background: transparent;
+	text-align: left;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.vce-email-form__suggestions button:hover,
+.vce-email-form__suggestions button:focus {
+	background: #f0f0f1;
 }

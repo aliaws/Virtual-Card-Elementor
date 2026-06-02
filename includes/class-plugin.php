@@ -32,6 +32,7 @@ require_once VCE_PLUGIN_DIR . 'includes/class-debug-log.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-vce-debug-page.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-vce-debug-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-submission-rest.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-submission-scheduler.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-user-account.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-um-hooks.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-profile-hooks.php';
@@ -87,6 +88,9 @@ class Plugin {
 
 		$card_submission_rest = new Card_Submission_Rest();
 		$card_submission_rest->register_hooks();
+
+		$submission_scheduler = new Submission_Scheduler();
+		$submission_scheduler->register_hooks();
 
 		$vce_debug_page = new Admin\Vce_Debug_Page();
 		$vce_debug_page->register_hooks();

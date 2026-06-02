@@ -97,7 +97,6 @@ final class Card_Submission_Rest {
 
 
 		update_post_meta( $post_id, Panel_Meta::SUBMISSION_LAYERS_META_KEY, $decoded );
-		update_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, 'saved' );
         // save submission so it can be edited
         update_option("LAST_DRAFT_SUBMISSION_{$user_id}", $post_id);
 
@@ -105,17 +104,64 @@ final class Card_Submission_Rest {
 			update_post_meta( $post_id, Panel_Meta::SUBMISSION_SENDER_ID, $user_id );
 		}
 
+		$dispatch = filter_var( $request->get_param( 'dispatch' ), FILTER_VALIDATE_BOOLEAN );
+		if ( $dispatch ) {
+			$recipient_email = sanitize_email( (string) ( $request->get_param( 'recipientEmail' ) ?: '' ) );
+			if ( ! is_email( $recipient_email ) ) {
+				return new WP_Error( 'vce_invalid_email', __( 'Invalid recipient email.', VCE_TEXT_DOMAIN ), [ 'status' => 400 ] );
+			}
+			update_post_meta( $post_id, Panel_Meta::SUBMISSION_RECEIVER_EMAIL, $recipient_email );
+
+			$send_mode = sanitize_key( (string) ( $request->get_param( 'sendMode' ) ?: 'now' ) );
+			if ( 'schedule' === $send_mode ) {
+				$scheduled_raw = sanitize_text_field( (string) ( $request->get_param( 'scheduledAt' ) ?: '' ) );
+				$scheduled_ts  = strtotime( $scheduled_raw );
+				if ( ! $scheduled_ts || $scheduled_ts <= current_time( 'timestamp' ) ) {
+					return new WP_Error( 'vce_invalid_schedule', __( 'Please choose a future date and time.', VCE_TEXT_DOMAIN ), [ 'status' => 400 ] );
+				}
+				$scheduled_mysql = wp_date( 'Y-m-d H:i:s', $scheduled_ts );
+				update_post_meta( $post_id, Panel_Meta::SUBMISSION_SCHEDULED_AT, $scheduled_mysql );
+				update_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, 'scheduled' );
+
+				$sender_id = $user_id ?: (int) get_post_meta( $post_id, Panel_Meta::SUBMISSION_SENDER_ID, true );
+				wp_update_post(
+					[
+						'ID'         => $post_id,
+						'post_title' => sprintf( '(VC - %d, Sender - %d, RC - %s)', $parent_id, $sender_id, $recipient_email ),
+					]
+				);
+
+				if ( $user_id ) {
+					delete_option( "LAST_DRAFT_SUBMISSION_{$user_id}" );
+				}
+
+				Submission_Logger::log(
+					$post_id,
+					'scheduled',
+					sprintf( 'Recipient: %s, Scheduled: %s', $recipient_email, $scheduled_mysql )
+				);
+			} else {
+				delete_post_meta( $post_id, Panel_Meta::SUBMISSION_SCHEDULED_AT );
+				update_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, 'saved' );
+			}
+		} else {
+			update_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, 'saved' );
+		}
+
 		$parent_title = get_the_title( $parent_id );
-		Submission_Logger::log(
-			$post_id,
-			'created',
-			sprintf(
-				'Virtual Card: %s (#%d), Sender: %s (#%d)',
-				$parent_title ?: '#', (string) $parent_id,
-				$user_id ? ( get_userdata( $user_id )->display_name ?: 'User' ) : 'Guest',
-				$user_id ?: 0
-			)
-		);
+		if ( 0 === $submission_id ) {
+			Submission_Logger::log(
+				$post_id,
+				'created',
+				sprintf(
+					'Virtual Card: %s (#%d), Sender: %s (#%d)',
+					$parent_title ?: '#',
+					(string) $parent_id,
+					$user_id ? ( get_userdata( $user_id )->display_name ?: 'User' ) : 'Guest',
+					$user_id ?: 0
+				)
+			);
+		}
 
 		$preview_url = add_query_arg(
 			[
