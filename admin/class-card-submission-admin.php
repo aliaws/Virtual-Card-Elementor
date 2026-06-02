@@ -483,15 +483,13 @@ class Card_Submission_Admin {
 			return;
 		}
 
-		wp_enqueue_style(
-			'vce-admin-card-submission',
-			VCE_PLUGIN_URL . 'assets/css/admin-card-submission.css',
-			[],
-			vce_asset_version( 'assets/css/admin-card-submission.css' )
-		);
-
-
 		if ( in_array( $hook_suffix, [ 'post.php', 'post-new.php' ], true ) ) {
+			wp_enqueue_style(
+				'vce-admin-card-submission-meta',
+				VCE_PLUGIN_URL . 'assets/css/admin-card-submission-meta.css',
+				[],
+				vce_asset_version( 'assets/css/admin-card-submission-meta.css' )
+			);
 			$this->enqueue_parent_picker_script();
 			return;
 		}
@@ -499,6 +497,13 @@ class Card_Submission_Admin {
 		if ( 'edit.php' !== $hook_suffix ) {
 			return;
 		}
+
+		wp_enqueue_style(
+			'vce-admin-card-submission',
+			VCE_PLUGIN_URL . 'assets/css/admin-card-submission.css',
+			[],
+			vce_asset_version( 'assets/css/admin-card-submission.css' )
+		);
 
 		wp_enqueue_script(
 			'vce-admin-card-send',
