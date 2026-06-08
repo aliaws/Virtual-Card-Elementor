@@ -40,6 +40,7 @@ $number = 1;
 					$view_url       = get_permalink( $sub->ID );
 					$color          = $status_colors[ $status ] ?? '#999';
 					$label          = $status_labels[ $status ] ?? ucfirst( $status );
+					// Blank unless status is scheduled; includes dynamic timezone label.
 					$scheduled_date = \Virtual_Card_Elementor\Panel_Meta::format_scheduled_at_display( (int) $sub->ID );
 					?>
 					<tr>

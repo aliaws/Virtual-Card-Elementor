@@ -220,6 +220,7 @@ class Card_Submission_Admin {
 		}
 
 		if ( 'vce_scheduled_at' === $column ) {
+			// Dynamic label via Schedule_Timezone; empty unless status is scheduled.
 			$display = Panel_Meta::format_scheduled_at_display( $post_id );
 			if ( $display ) {
 				echo esc_html( $display );

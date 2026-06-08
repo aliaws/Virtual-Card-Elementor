@@ -27,32 +27,33 @@ final class Submission_Scheduler {
 	}
 
 	public function process_due_submissions(): void {
-		$now = current_time( 'mysql' );
+		$now = time();
 
-		$due = get_posts(
+		// Status=scheduled only; due time checked in PHP so legacy + UTC meta both work.
+		$candidates = get_posts(
 			[
 				'post_type'      => Post_Type::CARD_SUBMISSION_POST_TYPE,
 				'post_status'    => 'publish',
-				'posts_per_page' => 20,
+				'posts_per_page' => 50,
 				'fields'         => 'ids',
 				'meta_query'     => [
-					'relation' => 'AND',
 					[
 						'key'     => Panel_Meta::SUBMISSION_STATUS,
 						'value'   => 'scheduled',
 						'compare' => '=',
 					],
-					[
-						'key'     => Panel_Meta::SUBMISSION_SCHEDULED_AT,
-						'value'   => $now,
-						'compare' => '<=',
-						'type'    => 'DATETIME',
-					],
 				],
+				'orderby'        => 'date',
+				'order'          => 'ASC',
 			]
 		);
 
-		foreach ( $due as $submission_id ) {
+		foreach ( $candidates as $submission_id ) {
+			$due_at = Panel_Meta::get_scheduled_utc_timestamp( (int) $submission_id );
+			if ( $due_at <= 0 || $due_at > $now ) {
+				continue;
+			}
+			// Past-due or due now: cron sends (polled every 5 minutes, not exact second).
 			Card_Email_Rest::send_submission_email( (int) $submission_id, '', '' );
 		}
 	}

@@ -87,6 +87,7 @@ body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-v
 	width: 7%;
 }
 
+/* Scheduled Date: keep header on one line (between Preview and Date). */
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_scheduled_at {
 	width: 13%;
 	min-width: 120px;

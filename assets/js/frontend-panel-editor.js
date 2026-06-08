@@ -159,7 +159,8 @@
 		var btnSaveSend = root.querySelector('[data-vce-save-send]');
 		var emailForm = root.querySelector('[data-vce-email-form]');
 		var sendModeSelect = root.querySelector('[data-vce-send-mode]');
-		var scheduleField = root.querySelector('[data-vce-schedule-field]');
+		var scheduleFields = root.querySelectorAll('[data-vce-schedule-field]');
+		var scheduleTimezoneSelect = root.querySelector('[data-vce-schedule-timezone]'); // IANA id; empty = site TZ
 		var scheduledAtInput = root.querySelector('[data-vce-scheduled-at]');
 		var recipientInput = root.querySelector('[data-vce-recipient-email]');
 		var recipientSuggestions = root.querySelector('[data-vce-recipient-suggestions]');
@@ -942,18 +943,20 @@
 					});
 				})
 				.then(function (result) {
-					if (!result.ok || !result.data) {
-						throw new Error('save_failed');
+					if (!result.ok || !result.data || !result.data.id) {
+						throw new Error(restErrorMessage(result.data, i18n.submissionFailed || 'Could not save submission.'));
 					}
 					if (result.data.id) {
 						submissionApi.submission_id = result.data.id;
 					}
+					// Layers-only save still returns dispatch meta for form state.
+					syncSubmissionDispatchFromResponse(result.data);
 					markSyncedWithServer();
 					var msg = i18n.submissionSaved || 'Submission saved successfully!';
 					setSubmissionLink(msg, '');
 				})
-				.catch(function () {
-					setSubmissionLink(i18n.submissionFailed || 'Could not save submission.', '');
+				.catch(function (err) {
+					setSubmissionLink(err.message || i18n.submissionFailed || 'Could not save submission.', '');
 				})
 				.finally(function () {
 					btnSaveSubmission.disabled = false;
@@ -961,29 +964,24 @@
 				});
 		}
 
-		function setScheduleMinDatetime() {
-			if (!scheduledAtInput) {
-				return;
-			}
-			var now = new Date();
-			now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-			scheduledAtInput.min = now.toISOString().slice(0, 16);
-		}
-
 		function syncSendModeFields() {
 			var isSchedule = sendModeSelect && sendModeSelect.value === 'schedule';
-			if (scheduleField) {
+			// Timezone + datetime rows share data-vce-schedule-field; toggled together.
+			scheduleFields.forEach(function (field) {
 				if (isSchedule) {
-					scheduleField.removeAttribute('hidden');
+					field.removeAttribute('hidden');
 				} else {
-					scheduleField.setAttribute('hidden', 'hidden');
+					field.setAttribute('hidden', 'hidden');
 				}
-			}
+			});
 			if (scheduledAtInput) {
 				scheduledAtInput.required = !!isSchedule;
 				if (!isSchedule) {
 					scheduledAtInput.value = '';
 				}
+			}
+			if (scheduleTimezoneSelect && !isSchedule) {
+				scheduleTimezoneSelect.value = '';
 			}
 		}
 
@@ -1107,21 +1105,65 @@
 			}, 250);
 		}
 
-		function showEmailForm() {
+		// Pre-fill Schedule-or-Send from PHP (edit) or last REST response.
+		function applySubmissionDispatch() {
+			var dispatch = cfg.submissionDispatch || {};
+			if (sendModeSelect) {
+				sendModeSelect.value = dispatch.sendMode === 'schedule' ? 'schedule' : 'now';
+			}
+			if (recipientInput) {
+				recipientInput.value = dispatch.recipientEmail || '';
+			}
+			if (scheduledAtInput) {
+				scheduledAtInput.value = dispatch.scheduledAt || '';
+			}
+			if (scheduleTimezoneSelect) {
+				scheduleTimezoneSelect.value = dispatch.scheduledTimezone || '';
+			}
+			if (senderInput) {
+				senderInput.value = dispatch.senderName || (cfg.currentUser && cfg.currentUser.displayName) || '';
+			}
+			if (messageInput) {
+				messageInput.value = dispatch.message || '';
+			}
+			syncSendModeFields();
+		}
+
+		// Keep form + cfg in sync after save so a second save does not lose dispatch fields.
+		function syncSubmissionDispatchFromResponse(data) {
+			if (!data) {
+				return;
+			}
+			cfg.submissionDispatch = cfg.submissionDispatch || {};
+			[ 'recipientEmail', 'scheduledAt', 'scheduledTimezone', 'senderName', 'message' ].forEach(function (key) {
+				if (typeof data[key] === 'string') {
+					cfg.submissionDispatch[key] = data[key];
+				}
+			});
+			if (data.sendMode) {
+				cfg.submissionDispatch.sendMode = data.sendMode;
+			}
+			if (typeof data.scheduledAt === 'string') {
+				cfg.submissionDispatch.autoOpenForm = data.scheduledAt !== '';
+			}
+			applySubmissionDispatch();
+		}
+
+		function restErrorMessage(data, fallback) {
+			if (data && data.message) {
+				return data.message;
+			}
+			return fallback || 'Request failed.';
+		}
+
+		function showEmailForm(skipFocus) {
 			if (emailForm) {
 				emailForm.removeAttribute('hidden');
 			}
-			if (sendModeSelect) {
-				sendModeSelect.value = 'now';
-			}
-			syncSendModeFields();
-			setScheduleMinDatetime();
-			if (senderInput && cfg.currentUser && cfg.currentUser.displayName) {
-				senderInput.value = cfg.currentUser.displayName;
-			}
-			if (recipientInput) {
+			applySubmissionDispatch();
+			if (!skipFocus && recipientInput) {
 				recipientInput.focus();
-				fetchRecipientSuggestions('');
+				fetchRecipientSuggestions(recipientInput.value.trim());
 			}
 		}
 
@@ -1143,6 +1185,9 @@
 			}
 			if (scheduledAtInput) {
 				scheduledAtInput.value = '';
+			}
+			if (scheduleTimezoneSelect) {
+				scheduleTimezoneSelect.value = '';
 			}
 			syncSendModeFields();
 			hideRecipientSuggestions();
@@ -1167,17 +1212,6 @@
 			}
 
 			var isSchedule = sendModeSelect && sendModeSelect.value === 'schedule';
-			if (isSchedule) {
-				if (!scheduledAtInput || !scheduledAtInput.value) {
-					setEmailStatus(i18n.scheduleRequired || 'Please choose a future date and time.', true);
-					return;
-				}
-				var scheduledTs = new Date(scheduledAtInput.value).getTime();
-				if (!scheduledTs || scheduledTs <= Date.now()) {
-					setEmailStatus(i18n.scheduleRequired || 'Please choose a future date and time.', true);
-					return;
-				}
-			}
 
 			saveCurrentPanelObjects();
 			sendBtn.disabled = true;
@@ -1198,9 +1232,13 @@
 				dispatch: true,
 				recipientEmail: recipientInput.value.trim(),
 				sendMode: isSchedule ? 'schedule' : 'now',
+				senderName: senderInput ? senderInput.value.trim() : '',
+				message: messageInput ? messageInput.value.trim() : '',
 			};
 			if (isSchedule && scheduledAtInput) {
 				saveBody.scheduledAt = scheduledAtInput.value;
+				// Empty scheduledTimezone → server uses WordPress site timezone.
+				saveBody.scheduledTimezone = scheduleTimezoneSelect ? scheduleTimezoneSelect.value : '';
 			}
 
 			fetch(submissionApi.endpoint, {
@@ -1215,12 +1253,13 @@
 					});
 				})
 				.then(function (result) {
-					if (!result.ok || !result.data) {
-						throw new Error('save_failed');
+					if (!result.ok || !result.data || !result.data.id) {
+						throw new Error(restErrorMessage(result.data, i18n.submissionFailed || 'Could not save submission.'));
 					}
 					if (result.data.id) {
 						submissionApi.submission_id = result.data.id;
 					}
+					syncSubmissionDispatchFromResponse(result.data);
 
 					if (isSchedule) {
 						return { scheduled: true, submission: result.data };
@@ -1240,7 +1279,7 @@
 				})
 				.then(function (data) {
 					if (data && data.scheduled) {
-						return { scheduled: true };
+						return { scheduled: true, submission: data.submission };
 					}
 
 					setEmailStatus(i18n.sendingEmail || 'Sending...');
@@ -1273,18 +1312,24 @@
 				.then(function (result) {
 					if (result && result.scheduled) {
 						markSyncedWithServer();
+						if (result.submission) {
+							syncSubmissionDispatchFromResponse(result.submission);
+						}
 						setEmailStatus(i18n.scheduledSuccess || 'E-Card scheduled successfully!');
 						return;
 					}
 					if (!result.ok) {
-						throw new Error('email_failed');
+						throw new Error(restErrorMessage(result.body, i18n.emailFailed || 'Could not send card.'));
 					}
 					markSyncedWithServer();
+					if (result.submission) {
+						syncSubmissionDispatchFromResponse(result.submission);
+					}
 					var msg = i18n.emailSent || 'E-Card sent successfully!';
 					setEmailStatus(msg);
 				})
-				.catch(function () {
-					setEmailStatus(i18n.emailFailed || 'Could not send card.', true);
+				.catch(function (err) {
+					setEmailStatus(err.message || i18n.emailFailed || 'Could not send card.', true);
 				})
 				.finally(function () {
 					sendBtn.disabled = false;
@@ -1465,6 +1510,11 @@
 			hasAnyLayerContent() || !!(submissionApi && submissionApi.submission_id);
 		updateDraftDirtyFlag();
 		loadPanel(0, true);
+
+		if (cfg.submissionDispatch && cfg.submissionDispatch.autoOpenForm) {
+			// Scheduled submission: show Schedule-or-Send form on load.
+			showEmailForm(true);
+		}
 
 		window.addEventListener('beforeunload', function (e) {
 			saveCurrentPanelObjects();

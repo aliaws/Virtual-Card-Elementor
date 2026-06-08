@@ -198,6 +198,27 @@ if ( false === $saved_json ) {
 				</select>
 			</p>
 			<p class="vce-email-form__field vce-email-form__field--schedule" data-vce-schedule-field hidden>
+				<label for="vce-schedule-timezone"><?php esc_html_e( 'Timezone', VCE_TEXT_DOMAIN ); ?></label>
+				<?php // Labels built at render time (DST-aware); values are IANA ids. ?>
+				<select id="vce-schedule-timezone" data-vce-schedule-timezone class="widefat">
+					<option value="">
+						<?php
+						printf(
+							/* translators: %s: WordPress site timezone */
+							esc_html__( 'Use site timezone (%s)', VCE_TEXT_DOMAIN ),
+							esc_html( wp_timezone_string() ?: 'UTC' )
+						);
+						?>
+					</option>
+					<?php
+					$schedule_timezone_options = $schedule_timezone_options ?? \Virtual_Card_Elementor\Schedule_Timezone::dropdown_choices();
+					foreach ( $schedule_timezone_options as $tz_value => $tz_label ) :
+						?>
+						<option value="<?php echo esc_attr( $tz_value ); ?>"><?php echo esc_html( $tz_label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</p>
+			<p class="vce-email-form__field vce-email-form__field--schedule" data-vce-schedule-field hidden>
 				<label for="vce-scheduled-at"><?php esc_html_e( 'Schedule date & time', VCE_TEXT_DOMAIN ); ?> *</label>
 				<input type="datetime-local" id="vce-scheduled-at" data-vce-scheduled-at class="widefat" />
 			</p>
