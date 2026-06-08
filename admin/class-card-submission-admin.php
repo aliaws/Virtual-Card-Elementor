@@ -29,6 +29,7 @@ class Card_Submission_Admin {
 		'vce_receiver_email',
 		'vce_status',
 		'vce_preview_link',
+		'vce_scheduled_at',
 		'date',
 	];
 
@@ -90,6 +91,20 @@ class Card_Submission_Admin {
 	}
 
 	/**
+	 * @return array<string, string>
+	 */
+	private function get_custom_column_labels(): array {
+		return [
+			'vce_parent_card'    => __( 'Virtual card', VCE_TEXT_DOMAIN ),
+			'vce_sender'         => __( 'Sender', VCE_TEXT_DOMAIN ),
+			'vce_receiver_email' => __( 'Receiver Email', VCE_TEXT_DOMAIN ),
+			'vce_status'         => __( 'Status', VCE_TEXT_DOMAIN ),
+			'vce_preview_link'   => __( 'Preview Link', VCE_TEXT_DOMAIN ),
+			'vce_scheduled_at'   => __( 'Scheduled Date', VCE_TEXT_DOMAIN ),
+		];
+	}
+
+	/**
 	 * @param string[] $columns Default columns.
 	 * @return string[]
 	 */
@@ -101,11 +116,9 @@ class Card_Submission_Admin {
 		if ( isset( $columns['title'] ) ) {
 			$new['title'] = __( 'Submission', VCE_TEXT_DOMAIN );
 		}
-		$new['vce_parent_card']     = __( 'Virtual card', VCE_TEXT_DOMAIN );
-		$new['vce_sender']           = __( 'Sender', VCE_TEXT_DOMAIN );
-		$new['vce_receiver_email']   = __( 'Receiver Email', VCE_TEXT_DOMAIN );
-		$new['vce_status']           = __( 'Status', VCE_TEXT_DOMAIN );
-		$new['vce_preview_link']     = __( 'Preview Link', VCE_TEXT_DOMAIN );
+		foreach ( $this->get_custom_column_labels() as $key => $label ) {
+			$new[ $key ] = $label;
+		}
 		if ( isset( $columns['date'] ) ) {
 			$new['date'] = $columns['date'];
 		}
@@ -119,9 +132,12 @@ class Card_Submission_Admin {
 	 * @return string[]
 	 */
 	public function strip_unwanted_columns( array $columns ): array {
+		$custom  = $this->get_custom_column_labels();
 		$ordered = [];
 		foreach ( self::LIST_COLUMNS as $key ) {
-			if ( isset( $columns[ $key ] ) ) {
+			if ( isset( $custom[ $key ] ) ) {
+				$ordered[ $key ] = $custom[ $key ];
+			} elseif ( isset( $columns[ $key ] ) ) {
 				$ordered[ $key ] = $columns[ $key ];
 			}
 		}
@@ -200,6 +216,16 @@ class Card_Submission_Admin {
 		if ( 'vce_status' === $column ) {
 			$status = get_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved';
 			$this->render_status_badge( (string) $status );
+			return;
+		}
+
+		if ( 'vce_scheduled_at' === $column ) {
+			$display = Panel_Meta::format_scheduled_at_display( $post_id );
+			if ( $display ) {
+				echo esc_html( $display );
+			} else {
+				echo '<span class="vce-submission-empty">—</span>';
+			}
 			return;
 		}
 

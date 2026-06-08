@@ -22,7 +22,7 @@ body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-c
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-title {
-	width: 16%;
+	width: 14%;
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-title .row-title {
@@ -47,7 +47,7 @@ body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-t
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_parent_card {
-	width: 14%;
+	width: 12%;
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_parent_card a {
@@ -63,12 +63,13 @@ body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-v
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_sender,
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_preview_link,
-body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_status {
+body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_status,
+body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_scheduled_at {
 	white-space: nowrap;
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_receiver_email {
-	width: 16%;
+	width: 14%;
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_receiver_email .vce-receiver-email {
@@ -83,11 +84,18 @@ body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-v
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_preview_link {
-	width: 8%;
+	width: 7%;
+}
+
+body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-vce_scheduled_at {
+	width: 13%;
+	min-width: 120px;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 body.edit-php.post-type-card_submission #wpbody-content .wp-list-table .column-date {
-	width: 14%;
+	width: 13%;
 	white-space: nowrap;
 }
 

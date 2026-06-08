@@ -87,4 +87,21 @@ public const SUBMISSION_VIEWED_COUNT = '_vce_viewed_count';
  */
 public const SUBMISSION_LOG = '_vce_submission_log';
 
+	/**
+	 * Formatted scheduled send datetime for list display, or empty when not scheduled.
+	 *
+	 * @param int $post_id Submission post ID.
+	 */
+	public static function format_scheduled_at_display( int $post_id ): string {
+		if ( 'scheduled' !== ( get_post_meta( $post_id, self::SUBMISSION_STATUS, true ) ?: 'saved' ) ) {
+			return '';
+		}
+		$scheduled_at = trim( (string) get_post_meta( $post_id, self::SUBMISSION_SCHEDULED_AT, true ) );
+		if ( '' === $scheduled_at ) {
+			return '';
+		}
+		$formatted = mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $scheduled_at );
+		return $formatted ?: $scheduled_at;
+	}
+
 }
