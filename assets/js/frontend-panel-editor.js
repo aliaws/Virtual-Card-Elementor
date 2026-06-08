@@ -168,8 +168,15 @@
 		var messageInput = root.querySelector('[data-vce-send-message]');
 		var sendBtn = root.querySelector('[data-vce-send-email]');
 		var cancelBtn = root.querySelector('[data-vce-cancel-email]');
-		var emailStatus = root.querySelector('[data-vce-email-status]');
+		// Notice UI: page banner + form-level validation alerts.
+		var emailAlert = root.querySelector('[data-vce-email-alert]');
+		var editorNoticeWrap = root.querySelector('[data-vce-editor-notice-wrap]');
 		var recipientFetchTimer = null;
+		var pageNoticeTimer = null;
+		var formAlertTimer = null;
+		var noticeAutoDismissMs = 8000; // 5–10s UX window for auto-dismiss.
+		// true when URL has ?id= matching this submission (edit vs create behavior).
+		var isEditSubmission = !!cfg.isEditSubmission;
 		var submissionLink = root.querySelector('[data-vce-submission-link]');
 		var inputSize = root.querySelector('[data-vce-font-size]');
 		var inputColor = root.querySelector('[data-vce-text-color]');
@@ -914,6 +921,97 @@
 			}
 		}
 
+		// Checkout-style banner at top of editor (WordPress transient + REST notice, auto-dismiss).
+		function showPageNotice(message, type) {
+			if (!editorNoticeWrap || !message) {
+				return;
+			}
+			if (pageNoticeTimer) {
+				clearTimeout(pageNoticeTimer);
+				pageNoticeTimer = null;
+			}
+			var kind = type === 'error' ? 'error' : 'success';
+			editorNoticeWrap.innerHTML = '';
+			var el = document.createElement('div');
+			el.className = 'vce-editor-notice vce-editor-notice--' + kind;
+			el.setAttribute('role', 'alert');
+			el.textContent = message;
+			editorNoticeWrap.appendChild(el);
+			editorNoticeWrap.removeAttribute('hidden');
+			// Hide after noticeAutoDismissMs without page reload.
+			pageNoticeTimer = setTimeout(function () {
+				editorNoticeWrap.setAttribute('hidden', 'hidden');
+				editorNoticeWrap.innerHTML = '';
+				pageNoticeTimer = null;
+			}, noticeAutoDismissMs);
+		}
+
+		// Validation / inline errors at top of Schedule-or-Send form.
+		function showFormAlert(message, isError) {
+			if (!emailAlert) {
+				if (message) {
+					showPageNotice(message, isError ? 'error' : 'success');
+				}
+				return;
+			}
+			if (formAlertTimer) {
+				clearTimeout(formAlertTimer);
+				formAlertTimer = null;
+			}
+			if (!message) {
+				emailAlert.textContent = '';
+				emailAlert.setAttribute('hidden', 'hidden');
+				emailAlert.classList.remove('vce-email-form__alert--success', 'vce-email-form__alert--error');
+				return;
+			}
+			emailAlert.textContent = message;
+			emailAlert.classList.toggle('vce-email-form__alert--error', !!isError);
+			emailAlert.classList.toggle('vce-email-form__alert--success', !isError);
+			emailAlert.removeAttribute('hidden');
+			formAlertTimer = setTimeout(function () {
+				showFormAlert('', false);
+				formAlertTimer = null;
+			}, noticeAutoDismissMs);
+		}
+
+		function resetDispatchDefaults() {
+			// Clear in-memory dispatch so reopening the form starts fresh after create success.
+			cfg.submissionDispatch = {
+				recipientEmail: '',
+				sendMode: 'now',
+				scheduledAt: '',
+				scheduledTimezone: '',
+				senderName: (cfg.currentUser && cfg.currentUser.displayName) || '',
+				message: '',
+				autoOpenForm: false,
+			};
+		}
+
+		// Create flow (!?id=): clear Schedule-or-Send fields and close form after dispatch success.
+		function resetAfterNewSubmission() {
+			resetDispatchDefaults();
+			hideEmailForm();
+		}
+
+		// Show success notice; reset/close form on create (!isEditSubmission), keep fields on edit (?id=).
+		function applyNoticeFromResponse(data, shouldResetForm) {
+			if (data && data.notice && data.notice.message) {
+				showPageNotice(data.notice.message, data.notice.type || 'success');
+			} else if (shouldResetForm) {
+				showPageNotice(i18n.scheduledSuccess || 'E-Card scheduled successfully!', 'success');
+			}
+			if (shouldResetForm) {
+				resetAfterNewSubmission();
+			} else if (data) {
+				syncSubmissionDispatchFromResponse(data);
+			}
+		}
+
+		// Redirect legacy setEmailStatus calls to top-of-form alert.
+		function setEmailStatus(msg, isError) {
+			showFormAlert(msg, isError);
+		}
+
 		function saveSubmission() {
 			if (!btnSaveSubmission || !submissionApi.endpoint) {
 				return;
@@ -952,11 +1050,14 @@
 					// Layers-only save still returns dispatch meta for form state.
 					syncSubmissionDispatchFromResponse(result.data);
 					markSyncedWithServer();
-					var msg = i18n.submissionSaved || 'Submission saved successfully!';
-					setSubmissionLink(msg, '');
+					setSubmissionLink('', '');
+					// Layers-only save: success banner only (no form reset; that is for Schedule/Send).
+					if (result.data.notice && result.data.notice.message) {
+						showPageNotice(result.data.notice.message, result.data.notice.type || 'success');
+					}
 				})
 				.catch(function (err) {
-					setSubmissionLink(err.message || i18n.submissionFailed || 'Could not save submission.', '');
+					showPageNotice(err.message || i18n.submissionFailed || 'Could not save submission.', 'error');
 				})
 				.finally(function () {
 					btnSaveSubmission.disabled = false;
@@ -997,6 +1098,24 @@
 			}
 		}
 
+		// Block Bitwarden/Chrome autofill; unlock on user interaction so typing still works.
+		function lockRecipientFromExtensions() {
+			if (!recipientInput) {
+				return;
+			}
+			recipientInput.setAttribute('readonly', 'readonly');
+			recipientInput.setAttribute('autocomplete', 'off');
+		}
+
+		function unlockRecipientField() {
+			if (!recipientInput) {
+				return;
+			}
+			// Allow typing after user click/touch/focus (paired with lockRecipientFromExtensions).
+			recipientInput.removeAttribute('readonly');
+		}
+
+		// Render plugin suggestion list below recipient input (position:absolute in CSS).
 		function showRecipientSuggestions(emails) {
 			if (!recipientSuggestions || !recipientInput) {
 				return;
@@ -1160,6 +1279,8 @@
 			if (emailForm) {
 				emailForm.removeAttribute('hidden');
 			}
+			// Re-lock recipient field so password managers do not autofill on open.
+			lockRecipientFromExtensions();
 			applySubmissionDispatch();
 			if (!skipFocus && recipientInput) {
 				recipientInput.focus();
@@ -1173,6 +1294,8 @@
 			}
 			if (recipientInput) {
 				recipientInput.value = '';
+				// Prepare for next open: readonly + extension ignore attrs restored.
+				lockRecipientFromExtensions();
 			}
 			if (senderInput) {
 				senderInput.value = '';
@@ -1191,23 +1314,17 @@
 			}
 			syncSendModeFields();
 			hideRecipientSuggestions();
-			if (emailStatus) {
-				emailStatus.setAttribute('hidden', 'hidden');
-			}
-		}
-
-		function setEmailStatus(msg, isError) {
-			if (!emailStatus) {
-				return;
-			}
-			emailStatus.textContent = msg || '';
-			emailStatus.style.color = isError ? '#d63638' : '#00a32a';
-			emailStatus.removeAttribute('hidden');
+			showFormAlert('', false);
 		}
 
 		function saveAndSend() {
 			if (!recipientInput || !recipientInput.value.trim()) {
 				setEmailStatus(i18n.recipientRequired || 'Please enter a recipient email.', true);
+				return;
+			}
+			// type=text field: validate email format client-side before REST save.
+			if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientInput.value.trim())) {
+				setEmailStatus(i18n.recipientInvalid || 'Please enter a valid email address.', true);
 				return;
 			}
 
@@ -1218,7 +1335,7 @@
 			sendBtn.textContent = isSchedule
 				? (i18n.scheduling || 'Scheduling...')
 				: (i18n.savingSubmission || 'Saving...');
-			setEmailStatus('');
+			showFormAlert('', false);
 
 			var headers = { 'Content-Type': 'application/json' };
 			if (submissionApi.nonce) {
@@ -1237,7 +1354,6 @@
 			};
 			if (isSchedule && scheduledAtInput) {
 				saveBody.scheduledAt = scheduledAtInput.value;
-				// Empty scheduledTimezone → server uses WordPress site timezone.
 				saveBody.scheduledTimezone = scheduleTimezoneSelect ? scheduleTimezoneSelect.value : '';
 			}
 
@@ -1259,13 +1375,16 @@
 					if (result.data.id) {
 						submissionApi.submission_id = result.data.id;
 					}
-					syncSubmissionDispatchFromResponse(result.data);
+					// Edit (?id=): keep form in sync with server; create flow resets after success.
+					if (isEditSubmission) {
+						syncSubmissionDispatchFromResponse(result.data);
+					}
 
 					if (isSchedule) {
 						return { scheduled: true, submission: result.data };
 					}
 
-					setEmailStatus(i18n.preparingPreview || 'Building preview...');
+					showFormAlert(i18n.preparingPreview || 'Building preview...', false);
 
 					return new Promise(function (resolve) {
 						if (window.vcePanelRenderer && typeof window.vcePanelRenderer.buildPreviewUrls === 'function') {
@@ -1279,10 +1398,10 @@
 				})
 				.then(function (data) {
 					if (data && data.scheduled) {
-						return { scheduled: true, submission: data.submission };
+						return data;
 					}
 
-					setEmailStatus(i18n.sendingEmail || 'Sending...');
+					showFormAlert(i18n.sendingEmail || 'Sending...', false);
 
 					var emailHeaders = { 'Content-Type': 'application/json' };
 					if (submissionApi.nonce) {
@@ -1299,6 +1418,8 @@
 							senderName: senderInput ? senderInput.value.trim() : '',
 							message: messageInput ? messageInput.value.trim() : '',
 							cardTitle: document.title || 'Virtual Card',
+							// Tells send-email REST to set transient notice (create vs edit copy if needed).
+							isNewSubmission: !isEditSubmission,
 							panels: data.previewUrls.map(function (url) {
 								return { url: url, w: 0, h: 0 };
 							}),
@@ -1312,21 +1433,28 @@
 				.then(function (result) {
 					if (result && result.scheduled) {
 						markSyncedWithServer();
-						if (result.submission) {
-							syncSubmissionDispatchFromResponse(result.submission);
-						}
-						setEmailStatus(i18n.scheduledSuccess || 'E-Card scheduled successfully!');
+						showFormAlert('', false);
+						// Create (!?id=): reset + close; edit: keep fields via applyNoticeFromResponse.
+						applyNoticeFromResponse(result.submission, !isEditSubmission);
 						return;
 					}
 					if (!result.ok) {
 						throw new Error(restErrorMessage(result.body, i18n.emailFailed || 'Could not send card.'));
 					}
 					markSyncedWithServer();
-					if (result.submission) {
+					showFormAlert('', false);
+
+					var notice = result.body && result.body.notice
+						? result.body.notice
+						: { message: i18n.emailSent || 'E-Card sent successfully!', type: 'success' };
+					showPageNotice(notice.message, notice.type);
+
+					// Send-now success: same create vs edit rules as schedule path.
+					if (!isEditSubmission) {
+						resetAfterNewSubmission();
+					} else if (result.submission) {
 						syncSubmissionDispatchFromResponse(result.submission);
 					}
-					var msg = i18n.emailSent || 'E-Card sent successfully!';
-					setEmailStatus(msg);
 				})
 				.catch(function (err) {
 					setEmailStatus(err.message || i18n.emailFailed || 'Could not send card.', true);
@@ -1382,8 +1510,16 @@
 			});
 		}
 		if (recipientInput) {
+			lockRecipientFromExtensions();
+			// Unlock readonly before input; avoids Bitwarden/Chrome autofill on focus.
+			recipientInput.addEventListener('mousedown', unlockRecipientField);
+			recipientInput.addEventListener('keydown', unlockRecipientField);
+			recipientInput.addEventListener('touchstart', unlockRecipientField, { passive: true });
 			recipientInput.addEventListener('input', debouncedRecipientSearch);
-			recipientInput.addEventListener('focus', debouncedRecipientSearch);
+			recipientInput.addEventListener('focus', function () {
+				unlockRecipientField();
+				debouncedRecipientSearch();
+			});
 			recipientInput.addEventListener('blur', function () {
 				setTimeout(hideRecipientSuggestions, 200);
 			});
@@ -1510,6 +1646,11 @@
 			hasAnyLayerContent() || !!(submissionApi && submissionApi.submission_id);
 		updateDraftDirtyFlag();
 		loadPanel(0, true);
+
+		// Transient notice from a prior request (e.g. after redirect); AJAX path uses REST response.
+		if (cfg.pendingNotice && cfg.pendingNotice.message) {
+			showPageNotice(cfg.pendingNotice.message, cfg.pendingNotice.type);
+		}
 
 		if (cfg.submissionDispatch && cfg.submissionDispatch.autoOpenForm) {
 			// Scheduled submission: show Schedule-or-Send form on load.

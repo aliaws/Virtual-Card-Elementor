@@ -38,8 +38,10 @@ final class Card_Submission_Rest {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function save_submission( WP_REST_Request $request ) {
-		$parent_id = absint( $request->get_param( 'parentId' ) );
-        $submission_id = absint( $request->get_param( 'submission_id' ) );
+		$parent_id     = absint( $request->get_param( 'parentId' ) );
+		$submission_id = absint( $request->get_param( 'submission_id' ) );
+		// True when this REST call creates the post (used for notice copy + isNewSubmission).
+		$was_new       = $submission_id <= 0;
 		if ( $parent_id <= 0 || Post_Type::POST_TYPE !== get_post_type( $parent_id ) ) {
 			return new WP_Error( 'vce_invalid_parent', __( 'Invalid E-card parent.', VCE_TEXT_DOMAIN ), [ 'status' => 400 ] );
 		}
@@ -231,18 +233,60 @@ final class Card_Submission_Rest {
 			$user_id ? ( get_userdata( $user_id )->display_name ?: get_userdata( $user_id )->user_login ) : ''
 		);
 
+		$notice_message = $this->build_save_notice_message( $was_new, $dispatch, $request );
+
+		// Send-now dispatch: defer user-facing notice until send-email completes (AJAX).
+		$dispatch_save = filter_var( $request->get_param( 'dispatch' ), FILTER_VALIDATE_BOOLEAN );
+		$send_mode     = sanitize_key( (string) ( $request->get_param( 'sendMode' ) ?: 'now' ) );
+		if ( $dispatch_save && 'now' === $send_mode ) {
+			$notice_message = '';
+		}
+
+		// Persist for page load fallback; JS also reads notice from this REST response.
+		if ( $notice_message && $user_id ) {
+			Submission_Notice::set( $user_id, $notice_message, 'success' );
+		}
+
 		return new WP_REST_Response(
 			array_merge(
 				[
-					'id'          => (int) $post_id,
-					'url'         => $permalink,
-					'preview_url' => $preview_url,
-					'edit_url'    => get_edit_post_link( $post_id, 'raw' ),
-					'status'      => get_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved',
+					'id'              => (int) $post_id,
+					'url'             => $permalink,
+					'preview_url'     => $preview_url,
+					'edit_url'        => get_edit_post_link( $post_id, 'raw' ),
+					'status'          => get_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved',
+					'isNewSubmission' => $was_new,
+					// Checkout-style banner payload for frontend-panel-editor.js (showPageNotice).
+					'notice'          => $notice_message ? [
+						'message' => $notice_message,
+						'type'    => 'success',
+					] : null,
 				],
 				$dispatch
 			),
 			200
 		);
+	}
+
+	/**
+	 * User-facing success copy after a submission save (layers-only or dispatch).
+	 */
+	private function build_save_notice_message( bool $was_new, array $dispatch, WP_REST_Request $request ): string {
+		$dispatch_save = filter_var( $request->get_param( 'dispatch' ), FILTER_VALIDATE_BOOLEAN );
+		if ( $dispatch_save ) {
+			$send_mode = sanitize_key( (string) ( $request->get_param( 'sendMode' ) ?: 'now' ) );
+			if ( 'schedule' === $send_mode ) {
+				return $was_new
+					? __( 'E-Card scheduled successfully!', VCE_TEXT_DOMAIN )
+					: __( 'Submission updated and scheduled successfully!', VCE_TEXT_DOMAIN );
+			}
+			return $was_new
+				? __( 'Submission saved successfully!', VCE_TEXT_DOMAIN )
+				: __( 'Submission updated successfully!', VCE_TEXT_DOMAIN );
+		}
+
+		return $was_new
+			? __( 'Submission created successfully!', VCE_TEXT_DOMAIN )
+			: __( 'Submission saved successfully!', VCE_TEXT_DOMAIN );
 	}
 }

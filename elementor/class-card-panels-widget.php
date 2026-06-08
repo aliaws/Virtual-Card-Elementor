@@ -11,6 +11,7 @@ use Elementor\Controls_Manager;
 use Elementor\Widget_Base;
 use Virtual_Card_Elementor\Panel_Meta;
 use Virtual_Card_Elementor\Schedule_Timezone;
+use Virtual_Card_Elementor\Submission_Notice;
 use Virtual_Card_Elementor\Template;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -371,6 +372,14 @@ class Card_Panels_Widget extends Widget_Base {
 			if ( $submission_id > 0 && $draft_submission instanceof \WP_Post ) {
 				$submission_dispatch = Panel_Meta::get_submission_dispatch( $submission_id, $fallback_sender );
 			}
+			$is_edit_submission = $submission_id > 0
+				&& isset( $_GET['id'] )
+				&& absint( $_GET['id'] ) === $submission_id
+				&& $draft_submission instanceof \WP_Post;
+
+			// Consume WordPress transient notice (AJAX also returns notice in REST JSON).
+			$pending_notice = $user_id ? Submission_Notice::get_and_clear( $user_id ) : null;
+
 			$editor_localize = [
 				'defaultFont'  => $font_key,
 				'fontStacks'   => self::get_font_stacks_for_js(),
@@ -379,6 +388,9 @@ class Card_Panels_Widget extends Widget_Base {
 				],
 				'submissionDispatch' => $submission_dispatch,
 				'siteTimezone'       => wp_timezone_string() ?: 'UTC', // Default when dropdown is empty.
+				// ?id= edit: keep form open after success; create: reset + close form.
+				'isEditSubmission'   => $is_edit_submission,
+				'pendingNotice'      => $pending_notice,
 				'submissionApi' => [
 					'endpoint'      => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
 					'submission_id' => $submission_id,
@@ -398,7 +410,9 @@ class Card_Panels_Widget extends Widget_Base {
 					'finalReview'         => __( 'Final review', VCE_TEXT_DOMAIN ),
 					'saveSubmission'      => __( 'Save submission', VCE_TEXT_DOMAIN ),
 					'savingSubmission'    => __( 'Saving…', VCE_TEXT_DOMAIN ),
-					'submissionSaved'     => __( 'Submission saved. Opening preview…', VCE_TEXT_DOMAIN ),
+					'submissionSaved'     => __( 'Submission saved successfully!', VCE_TEXT_DOMAIN ),
+					'submissionCreated'   => __( 'Submission created successfully!', VCE_TEXT_DOMAIN ),
+					'submissionUpdated'   => __( 'Submission updated successfully!', VCE_TEXT_DOMAIN ),
 					'submissionFailed'    => __( 'Could not save submission.', VCE_TEXT_DOMAIN ),
 					'closePreview'        => __( 'Close', VCE_TEXT_DOMAIN ),
 					'previewLoading'      => __( 'Building preview…', VCE_TEXT_DOMAIN ),
@@ -414,6 +428,8 @@ class Card_Panels_Widget extends Widget_Base {
 					'scheduledSuccess'    => __( 'E-Card scheduled successfully!', VCE_TEXT_DOMAIN ),
 					'emailFailed'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
 					'recipientRequired'   => __( 'Please enter a recipient email.', VCE_TEXT_DOMAIN ),
+					// Shown when type=text recipient field fails client-side format check.
+					'recipientInvalid'    => __( 'Please enter a valid email address.', VCE_TEXT_DOMAIN ),
 					'preparingPreview'    => __( 'Building preview...', VCE_TEXT_DOMAIN ),
 					'sendingEmail'        => __( 'Sending...', VCE_TEXT_DOMAIN ),
 					'scheduling'          => __( 'Scheduling...', VCE_TEXT_DOMAIN ),

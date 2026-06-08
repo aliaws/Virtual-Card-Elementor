@@ -9,6 +9,7 @@ namespace Virtual_Card_Elementor\Admin;
 
 use Virtual_Card_Elementor\Panel_Meta;
 use Virtual_Card_Elementor\Post_Type;
+use Virtual_Card_Elementor\Schedule_Timezone; // Friendly timezone labels in tracking meta box.
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -91,6 +92,31 @@ class Card_Submission_Meta_Box {
 		];
 		$status_label = $status_labels[ $status ] ?? ucfirst( $status );
 		$status_color = $status_colors[ $status ] ?? '#999';
+
+		// Scheduled send display for admin tracking (UTC meta + legacy _vce_scheduled_at).
+		$scheduled_datetime_display = '—';
+		$scheduled_timezone_display = '—';
+		$scheduled_utc              = Panel_Meta::get_scheduled_utc_timestamp( (int) $post->ID );
+		if ( $scheduled_utc > 0 ) {
+			try {
+				// Format in the timezone chosen at schedule time (or site TZ when empty).
+				$scheduled_tz = new \DateTimeZone( Panel_Meta::get_scheduled_timezone( (int) $post->ID ) );
+				$scheduled_datetime_display = wp_date(
+					get_option( 'date_format' ) . ' ' . get_option( 'time_format' ),
+					$scheduled_utc,
+					$scheduled_tz
+				);
+				$tz_stored = Panel_Meta::get_scheduled_timezone_for_input( (int) $post->ID );
+				$tz_id     = $tz_stored ?: Panel_Meta::get_scheduled_timezone( (int) $post->ID );
+				// Same friendly label as front-end schedule dropdown.
+				$scheduled_timezone_display = Schedule_Timezone::display_label( $tz_id );
+				if ( '' === $tz_stored ) {
+					$scheduled_timezone_display .= ' — ' . __( 'Site timezone', VCE_TEXT_DOMAIN );
+				}
+			} catch ( \Exception $e ) {
+				$scheduled_datetime_display = Panel_Meta::format_scheduled_at_display( (int) $post->ID ) ?: '—';
+			}
+		}
 		?>
 		<table class="widefat" style="border:0;">
 			<tbody>
@@ -117,6 +143,15 @@ class Card_Submission_Meta_Box {
 							<?php echo esc_html( $status_label ); ?>
 						</span>
 					</td>
+				</tr>
+				<?php // Read-only schedule fields (shown when submission has schedule meta). ?>
+				<tr>
+					<td style="width:140px;font-weight:600;padding:8px 10px;"><?php esc_html_e( 'Scheduled Date & Time', VCE_TEXT_DOMAIN ); ?></td>
+					<td style="padding:8px 10px;"><?php echo esc_html( $scheduled_datetime_display ); ?></td>
+				</tr>
+				<tr>
+					<td style="width:140px;font-weight:600;padding:8px 10px;"><?php esc_html_e( 'Schedule Timezone', VCE_TEXT_DOMAIN ); ?></td>
+					<td style="padding:8px 10px;"><?php echo esc_html( $scheduled_timezone_display ); ?></td>
 				</tr>
 				<tr>
 					<td style="width:140px;font-weight:600;padding:8px 10px;"><?php esc_html_e( 'Times Sent', VCE_TEXT_DOMAIN ); ?></td>

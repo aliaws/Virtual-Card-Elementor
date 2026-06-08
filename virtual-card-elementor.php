@@ -64,6 +64,8 @@ if ( ! function_exists( 'vce_bootstrap_require' ) ) {
 
 require_once VCE_PLUGIN_DIR . 'includes/class-panel-meta.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-schedule-timezone.php';
+// AJAX + transient success/error banners for submission saves (no page reload).
+require_once VCE_PLUGIN_DIR . 'includes/class-submission-notice.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-template.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-editor-access.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-post-type.php';
