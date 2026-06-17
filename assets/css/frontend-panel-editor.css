@@ -189,6 +189,10 @@
 	gap: 8px;
 }
 
+.vce-panel-editor__field--bg .vce-panel-editor__color-tool {
+	gap: 4px;
+}
+
 .vce-panel-editor__color-hit {
 	display: inline-flex;
 	align-items: center;
@@ -394,10 +398,36 @@
 	text-decoration: underline;
 }
 
-/* Stage */
-.vce-panel-editor__stage-outer {
-	margin-bottom: 16px;
+/* Workspace: filmstrip (left) + stage (right) */
+.vce-panel-editor__workspace {
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	justify-content: flex-start;
+	gap: clamp(12px, 2.5vw, 24px);
+	margin: 12px 0 16px;
+	width: 100%;
+	min-width: 0;
 }
+
+.vce-panel-editor__filmstrip-wrap {
+	flex: 0 0 auto;
+	align-self: flex-start;
+	width: max-content;
+	max-width: 100%;
+	min-width: 0;
+	margin: 0;
+}
+
+.vce-panel-editor__stage-outer {
+	flex: 1 1 0;
+	min-width: 0;
+	width: 100%;
+	margin: 0;
+	align-self: stretch;
+}
+
+/* Stage */
 
 .vce-panel-editor__stage {
 	background: #fff;
@@ -435,10 +465,6 @@
 }
 
 /* Filmstrip */
-.vce-panel-editor__filmstrip-wrap {
-	margin-top: 8px;
-}
-
 .vce-panel-editor__filmstrip-title {
 	margin: 0 0 8px;
 	font-size: 11px;
@@ -446,21 +472,26 @@
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
 	color: #646970;
+	text-align: left;
 }
 
 .vce-panel-editor__filmstrip {
 	display: flex;
+	flex-direction: column;
 	flex-wrap: nowrap;
+	align-items: stretch;
 	gap: 10px;
 	list-style: none;
 	margin: 0;
 	padding: 10px 8px;
-	overflow-x: auto;
+	overflow-x: hidden;
+	overflow-y: auto;
+	max-height: min(84vh, 900px);
 	-webkit-overflow-scrolling: touch;
 	border: 1px solid var(--vce-editor-border);
 	border-radius: var(--vce-editor-radius);
 	background: #fff;
-	scroll-snap-type: x proximity;
+	scroll-snap-type: y proximity;
 }
 
 .vce-panel-editor__filmstrip li {
@@ -735,6 +766,40 @@
 	box-shadow: none;
 }
 
+@media (max-width: 900px) {
+	.vce-panel-editor__workspace {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 12px;
+	}
+
+	.vce-panel-editor__filmstrip-wrap {
+		width: 100%;
+		max-width: none;
+		order: 1;
+	}
+
+	.vce-panel-editor__stage-outer {
+		order: 2;
+		flex: 1 1 auto;
+	}
+
+	.vce-panel-editor__filmstrip {
+		flex-direction: row;
+		flex-wrap: nowrap;
+		align-items: center;
+		overflow-x: auto;
+		overflow-y: hidden;
+		max-height: none;
+		width: 100%;
+		scroll-snap-type: x proximity;
+	}
+
+	.vce-panel-editor__filmstrip li {
+		scroll-snap-align: center;
+	}
+}
+
 @media (max-width: 600px) {
 	.vce-panel-editor__toolbar-main {
 		padding: 10px 12px 12px;
@@ -748,6 +813,11 @@
 	.vce-panel-editor__field-label {
 		display: none;
 	}
+
+	.vce-panel-editor__thumb img {
+		width: 64px;
+		height: 64px;
+	}
 }
 
 .vce-email-form {
@@ -756,6 +826,60 @@
 	border-radius: var(--vce-editor-radius);
 	padding: 16px;
 	margin: 12px 0;
+	overflow: visible;
+}
+
+/* Checkout-style page notice (AJAX + WordPress transient on load). */
+.vce-editor-notice-wrap {
+	margin: 0 0 12px;
+}
+
+/* Success/error pill rendered by showPageNotice(). */
+.vce-editor-notice {
+	margin: 0;
+	padding: 12px 16px;
+	border-radius: 4px;
+	font-size: 14px;
+	line-height: 1.5;
+	list-style: none;
+}
+
+.vce-editor-notice--success {
+	background: #ecf7ed;
+	border-left: 4px solid #7ad03a;
+	color: #1d2327;
+}
+
+.vce-editor-notice--error {
+	background: #fcf0f1;
+	border-left: 4px solid #d63638;
+	color: #1d2327;
+}
+
+.vce-email-form__inner {
+	overflow: visible;
+	position: relative;
+}
+
+/* Top-of-form validation messages (Schedule-or-Send). */
+.vce-email-form__alert {
+	margin: 0 0 12px;
+	padding: 10px 12px;
+	border-radius: 4px;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.vce-email-form__alert--success {
+	background: #ecf7ed;
+	border-left: 4px solid #7ad03a;
+	color: #1d2327;
+}
+
+.vce-email-form__alert--error {
+	background: #fcf0f1;
+	border-left: 4px solid #d63638;
+	color: #1d2327;
 }
 
 .vce-email-form__field {
@@ -775,7 +899,65 @@
 	align-items: center;
 }
 
-.vce-email-form__status {
-	margin: 8px 0 0;
+.vce-email-form__field--recipient {
+	position: relative;
+	z-index: 2;
+	overflow: visible;
+}
+
+/*
+ * Recipient input + plugin suggestion list.
+ * position:relative here; .vce-email-form__suggestions is absolute below the input.
+ */
+.vce-email-form__recipient-wrap {
+	position: relative;
+	display: block;
+	width: 100%;
+	overflow: visible;
+}
+
+/* Plugin-owned recipient history dropdown (not browser/Bitwarden autofill). */
+.vce-email-form__suggestions {
+	display: none;
+	position: absolute;
+	z-index: 10050;
+	left: 0;
+	right: 0;
+	top: calc(100% + 2px);
+	bottom: auto;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	background: #fff;
+	border: 1px solid var(--vce-editor-border, #c3c4c7);
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.vce-email-form__suggestions.is-open {
+	display: block;
+}
+
+.vce-email-form__suggestions li {
+	margin: 0;
+}
+
+.vce-email-form__suggestions button {
+	display: block;
+	width: 100%;
+	padding: 8px 12px;
+	border: 0;
+	background: transparent;
+	color: inherit; /* Avoid theme link/pink styles on suggestion rows. */
+	text-align: left;
 	font-size: 13px;
+	cursor: pointer;
+}
+
+.vce-email-form__suggestions button:hover,
+.vce-email-form__suggestions button:focus {
+	background: #f0f0f1;
+	color: black !important;
 }

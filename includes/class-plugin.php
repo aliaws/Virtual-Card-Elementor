@@ -11,11 +11,18 @@ use Virtual_Card_Elementor\Admin\Attachment_Tags;
 use Virtual_Card_Elementor\Admin\Card_Labels_Meta_Box;
 use Virtual_Card_Elementor\Admin\Card_Submission_Admin;
 use Virtual_Card_Elementor\Admin\Panel_Meta_Box;
+use Virtual_Card_Elementor\Admin\Virtual_Card_Gallery_Page;
 use Virtual_Card_Elementor\Admin\Virtual_Card_Admin_Columns;
 use Virtual_Card_Elementor\Elementor\Card_Panels_Widget;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+
+// E-card category tabs + filtering (safe load if deploy omits new files).
+if ( function_exists( 'vce_bootstrap_require' ) ) {
+	vce_bootstrap_require( 'includes/class-ecard-category-filter.php' );
+	vce_bootstrap_require( 'includes/class-ecard-category-tabs.php' );
 }
 
 require_once VCE_PLUGIN_DIR . 'admin/class-virtual-card-admin-columns.php';
@@ -25,6 +32,7 @@ require_once VCE_PLUGIN_DIR . 'includes/class-debug-log.php';
 require_once VCE_PLUGIN_DIR . 'admin/class-vce-debug-page.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-vce-debug-rest.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-card-submission-rest.php';
+require_once VCE_PLUGIN_DIR . 'includes/class-submission-scheduler.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-user-account.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-um-hooks.php';
 require_once VCE_PLUGIN_DIR . 'includes/class-profile-hooks.php';
@@ -81,6 +89,9 @@ class Plugin {
 		$card_submission_rest = new Card_Submission_Rest();
 		$card_submission_rest->register_hooks();
 
+		$submission_scheduler = new Submission_Scheduler();
+		$submission_scheduler->register_hooks();
+
 		$vce_debug_page = new Admin\Vce_Debug_Page();
 		$vce_debug_page->register_hooks();
 
@@ -96,8 +107,32 @@ class Plugin {
 		$attachment_tags = new Attachment_Tags();
 		$attachment_tags->register_hooks();
 
+		$gallery_page = new Virtual_Card_Gallery_Page();
+		$gallery_page->register_hooks();
+
 		$user_account = new User_Account();
 		$user_account->register_hooks();
+
+		if ( class_exists( Ecard_Category_Tabs::class ) ) {
+			$ecard_tabs = new Ecard_Category_Tabs();
+			$ecard_tabs->register_hooks();
+		} elseif ( is_admin() && current_user_can( 'manage_options' ) ) {
+			add_action(
+				'admin_notices',
+				static function (): void {
+					if ( ! current_user_can( 'manage_options' ) ) {
+						return;
+					}
+					echo '<div class="notice notice-error"><p>';
+					echo esc_html__(
+						'Virtual Card Elementor: missing includes/class-ecard-category-tabs.php (and/or class-ecard-category-filter.php). Re-upload the full plugin package.',
+						VCE_TEXT_DOMAIN
+					);
+					echo '</p></div>';
+				}
+			);
+		}
+
 		$um_hooks = new Um_Hooks();
 		$um_hooks->register_hooks();
 

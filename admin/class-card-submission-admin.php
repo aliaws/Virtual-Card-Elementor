@@ -9,6 +9,7 @@ namespace Virtual_Card_Elementor\Admin;
 
 use Virtual_Card_Elementor\Panel_Meta;
 use Virtual_Card_Elementor\Post_Type;
+use Virtual_Card_Elementor\Template;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -19,19 +20,88 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Card_Submission_Admin {
 
+	/** @var string[] Allowed list-table column keys (order preserved). */
+	private const LIST_COLUMNS = [
+		'cb',
+		'title',
+		'vce_parent_card',
+		'vce_sender',
+		'vce_receiver_email',
+		'vce_status',
+		'vce_preview_link',
+		'vce_scheduled_at',
+		'date',
+	];
+
 	/**
 	 * Register hooks.
 	 */
 	public function register_hooks(): void {
-		add_filter( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_columns', [ $this, 'columns' ] );
+		add_filter( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_columns', [ $this, 'columns' ], 5 );
+		add_filter( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_columns', [ $this, 'strip_unwanted_columns' ], 999 );
+		add_filter( 'the_title', [ $this, 'filter_submission_list_title' ], 10, 2 );
 		add_action( 'manage_' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_posts_custom_column', [ $this, 'column_content' ], 10, 2 );
 		add_filter( 'manage_edit-' . Post_Type::CARD_SUBMISSION_POST_TYPE . '_sortable_columns', [ $this, 'sortable_columns' ] );
-		add_action( 'restrict_manage_posts', [ $this, 'filter_dropdown_parent_card' ], 10, 2 );
+		add_action( 'restrict_manage_posts', [ $this, 'render_list_filters' ], 10, 2 );
+		add_action( 'pre_get_posts', [ $this, 'apply_list_filters' ] );
 		add_action( 'add_meta_boxes', [ $this, 'add_parent_meta_box' ] );
 		add_action( 'save_post', [ $this, 'save_parent_meta_box' ], 10, 2 );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_parent_picker_script' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 		add_filter( 'post_row_actions', [ $this, 'add_send_row_action' ], 10, 2 );
-		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_send_script' ] );
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	private function get_status_labels(): array {
+		return [
+			'saved'     => __( 'Saved', VCE_TEXT_DOMAIN ),
+			'scheduled' => __( 'Scheduled', VCE_TEXT_DOMAIN ),
+			'sent'      => __( 'Sent', VCE_TEXT_DOMAIN ),
+			'viewed'    => __( 'Viewed', VCE_TEXT_DOMAIN ),
+		];
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	private function get_status_colors(): array {
+		return [
+			'saved'     => '#f0ad4e',
+			'scheduled' => '#6f42c1',
+			'sent'      => '#5bc0de',
+			'viewed'    => '#5cb85c',
+		];
+	}
+
+	/**
+	 * @param string $status Status slug.
+	 */
+	private function render_status_badge( string $status ): void {
+		$labels = $this->get_status_labels();
+		$colors = $this->get_status_colors();
+		Template::render(
+			'admin/partials/submission-status-badge.php',
+			[
+				'status'       => $status,
+				'status_label' => $labels[ $status ] ?? ucfirst( $status ),
+				'status_color' => $colors[ $status ] ?? '#999',
+			]
+		);
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	private function get_custom_column_labels(): array {
+		return [
+			'vce_parent_card'    => __( 'Virtual card', VCE_TEXT_DOMAIN ),
+			'vce_sender'         => __( 'Sender', VCE_TEXT_DOMAIN ),
+			'vce_receiver_email' => __( 'Receiver Email', VCE_TEXT_DOMAIN ),
+			'vce_status'         => __( 'Status', VCE_TEXT_DOMAIN ),
+			'vce_preview_link'   => __( 'Preview Link', VCE_TEXT_DOMAIN ),
+			'vce_scheduled_at'   => __( 'Scheduled Date', VCE_TEXT_DOMAIN ),
+		];
 	}
 
 	/**
@@ -44,12 +114,10 @@ class Card_Submission_Admin {
 			$new['cb'] = $columns['cb'];
 		}
 		if ( isset( $columns['title'] ) ) {
-			$new['title'] = $columns['title'];
+			$new['title'] = __( 'Submission', VCE_TEXT_DOMAIN );
 		}
-		$new['vce_parent_card'] = __( 'Virtual card', VCE_TEXT_DOMAIN );
-		$new['vce_final_view']  = __( 'Final view', VCE_TEXT_DOMAIN );
-		if ( isset( $columns['author'] ) ) {
-			$new['author'] = $columns['author'];
+		foreach ( $this->get_custom_column_labels() as $key => $label ) {
+			$new[ $key ] = $label;
 		}
 		if ( isset( $columns['date'] ) ) {
 			$new['date'] = $columns['date'];
@@ -58,28 +126,124 @@ class Card_Submission_Admin {
 	}
 
 	/**
+	 * Remove third-party columns (e.g. AIOSEO Details) added after our column filter.
+	 *
+	 * @param string[] $columns Column headers.
+	 * @return string[]
+	 */
+	public function strip_unwanted_columns( array $columns ): array {
+		$custom  = $this->get_custom_column_labels();
+		$ordered = [];
+		foreach ( self::LIST_COLUMNS as $key ) {
+			if ( isset( $custom[ $key ] ) ) {
+				$ordered[ $key ] = $custom[ $key ];
+			} elseif ( isset( $columns[ $key ] ) ) {
+				$ordered[ $key ] = $columns[ $key ];
+			}
+		}
+		return $ordered;
+	}
+
+	/**
+	 * Shorter, readable label in the Submission column (replaces auto post title).
+	 *
+	 * @param string $title   Post title.
+	 * @param int    $post_id Post ID.
+	 */
+	public function filter_submission_list_title( string $title, int $post_id = 0 ): string {
+		if ( ! is_admin() || $post_id <= 0 || Post_Type::CARD_SUBMISSION_POST_TYPE !== get_post_type( $post_id ) ) {
+			return $title;
+		}
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit-card_submission' !== $screen->id ) {
+			return $title;
+		}
+		return $this->get_submission_list_label( $post_id );
+	}
+
+	/**
+	 * @param int $post_id Submission post ID.
+	 */
+	private function get_submission_list_label( int $post_id ): string {
+		$parent_id    = (int) wp_get_post_parent_id( $post_id );
+		$parent_title = $parent_id ? get_the_title( $parent_id ) : '';
+		$receiver     = (string) get_post_meta( $post_id, Panel_Meta::SUBMISSION_RECEIVER_EMAIL, true );
+
+		if ( $parent_title && $receiver ) {
+			return sprintf(
+				'%s → %s',
+				$parent_title,
+				$receiver
+			);
+		}
+		if ( $parent_title ) {
+			return $parent_title;
+		}
+		if ( $receiver ) {
+			return $receiver;
+		}
+		return sprintf(
+			/* translators: %d: submission post ID */
+			__( 'Submission #%d', VCE_TEXT_DOMAIN ),
+			$post_id
+		);
+	}
+
+	/**
 	 * @param string $column  Column key.
 	 * @param int    $post_id Post ID.
 	 */
 	public function column_content( string $column, int $post_id ): void {
-		if ( 'vce_final_view' === $column ) {
-			$url = add_query_arg(
-				[
-					'post_type' => Post_Type::CARD_SUBMISSION_POST_TYPE,
-					'p'         => $post_id,
-				],
-				home_url( '/' )
-			);
+		if ( 'vce_preview_link' === $column ) {
+			$url = get_permalink( $post_id );
+			if ( ! $url ) {
+				$url = add_query_arg(
+					[
+						'post_type' => Post_Type::CARD_SUBMISSION_POST_TYPE,
+						'p'         => $post_id,
+					],
+					home_url( '/' )
+				);
+			}
 			printf(
-				'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+				'<a href="%1$s" class="vce-preview-link" target="_blank" rel="noopener noreferrer">%2$s</a>',
 				esc_url( $url ),
-				esc_html__( 'Open final view', VCE_TEXT_DOMAIN )
+				esc_html__( 'Preview', VCE_TEXT_DOMAIN )
 			);
 			return;
 		}
+
+		if ( 'vce_status' === $column ) {
+			$status = get_post_meta( $post_id, Panel_Meta::SUBMISSION_STATUS, true ) ?: 'saved';
+			$this->render_status_badge( (string) $status );
+			return;
+		}
+
+		if ( 'vce_scheduled_at' === $column ) {
+			// Dynamic label via Schedule_Timezone; empty unless status is scheduled.
+			$display = Panel_Meta::format_scheduled_at_display( $post_id );
+			if ( $display ) {
+				echo esc_html( $display );
+			} else {
+				echo '<span class="vce-submission-empty">—</span>';
+			}
+			return;
+		}
+
+		if ( 'vce_sender' === $column ) {
+			$this->render_sender_column( $post_id );
+			return;
+		}
+
+		if ( 'vce_receiver_email' === $column ) {
+			$this->render_receiver_email_column( $post_id );
+			return;
+		}
+
 		if ( 'vce_parent_card' !== $column ) {
 			return;
 		}
+
 		$parent_id = (int) wp_get_post_parent_id( $post_id );
 		if ( $parent_id <= 0 ) {
 			echo '<span class="vce-submission-no-parent">—</span>';
@@ -103,6 +267,52 @@ class Card_Submission_Admin {
 	}
 
 	/**
+	 * @param int $post_id Submission post ID.
+	 */
+	private function render_sender_column( int $post_id ): void {
+		$sender_id   = (int) get_post_meta( $post_id, Panel_Meta::SUBMISSION_SENDER_ID, true );
+		$sender_user = $sender_id ? get_userdata( $sender_id ) : null;
+
+		if ( $sender_user ) {
+			$edit_link = get_edit_user_link( $sender_id );
+			if ( $edit_link ) {
+				printf(
+					'<a href="%1$s">%2$s</a>',
+					esc_url( $edit_link ),
+					esc_html( $sender_user->display_name ?: $sender_user->user_login )
+				);
+			} else {
+				echo esc_html( $sender_user->display_name ?: $sender_user->user_login );
+			}
+			return;
+		}
+
+		if ( $sender_id ) {
+			echo esc_html( '#' . (string) $sender_id );
+			return;
+		}
+
+		echo '<span class="vce-submission-empty">—</span>';
+	}
+
+	/**
+	 * @param int $post_id Submission post ID.
+	 */
+	private function render_receiver_email_column( int $post_id ): void {
+		$receiver_email = get_post_meta( $post_id, Panel_Meta::SUBMISSION_RECEIVER_EMAIL, true );
+		if ( $receiver_email ) {
+			printf(
+				'<a href="mailto:%1$s" class="vce-receiver-email">%2$s</a>',
+				esc_attr( $receiver_email ),
+				esc_html( $receiver_email )
+			);
+			return;
+		}
+
+		echo '<span class="vce-submission-empty">—</span>';
+	}
+
+	/**
 	 * @param string[] $columns Sortable map.
 	 * @return string[]
 	 */
@@ -112,34 +322,57 @@ class Card_Submission_Admin {
 	}
 
 	/**
-	 * Dropdown above the list: filter by parent virtual card.
+	 * Status + parent virtual card filters (before the Filter button).
 	 *
 	 * @param string $post_type Post type slug.
 	 * @param string $which     Position (top/extra).
 	 */
-	public function filter_dropdown_parent_card( string $post_type, string $which = '' ): void {
-		if ( Post_Type::CARD_SUBMISSION_POST_TYPE !== $post_type ) {
+	public function render_list_filters( string $post_type, string $which = '' ): void {
+		if ( Post_Type::CARD_SUBMISSION_POST_TYPE !== $post_type || 'top' !== $which ) {
 			return;
 		}
-		if ( 'extra' === $which ) {
-			return;
+
+		$status_selected = isset( $_GET['vce_submission_status'] )
+			? sanitize_key( wp_unslash( $_GET['vce_submission_status'] ) )
+			: '';
+		$parent_selected = isset( $_GET['vce_parent_card'] ) ? absint( wp_unslash( $_GET['vce_parent_card'] ) ) : 0;
+
+		echo '<span class="vce-submission-filters">';
+
+		$labels = $this->get_status_labels();
+		echo '<label for="vce_submission_status" class="screen-reader-text">' . esc_html__( 'Filter by status', VCE_TEXT_DOMAIN ) . '</label>';
+		echo '<select name="vce_submission_status" id="vce_submission_status" class="vce-list-filter-select">';
+		printf(
+			'<option value="">%s</option>',
+			esc_html__( 'All statuses', VCE_TEXT_DOMAIN )
+		);
+		foreach ( $labels as $slug => $label ) {
+			printf(
+				'<option value="%1$s" %2$s>%3$s</option>',
+				esc_attr( $slug ),
+				selected( $status_selected, $slug, false ),
+				esc_html( $label )
+			);
 		}
-		$selected = isset( $_GET['vce_parent_card'] ) ? absint( wp_unslash( $_GET['vce_parent_card'] ) ) : 0;
+		echo '</select>';
+
 		$this->render_virtual_card_select(
 			'vce_parent_card',
 			'vce_parent_card',
-			$selected,
-			__( 'All virtual cards', VCE_TEXT_DOMAIN ),
-			false
+			$parent_selected,
+			__( 'All E-cards', VCE_TEXT_DOMAIN ),
+			'list'
 		);
+
+		echo '</span>';
 	}
 
 	/**
-	 * Apply list filter when a virtual card is chosen.
+	 * Apply list filters when status or parent virtual card is chosen.
 	 *
 	 * @param \WP_Query $query Query.
 	 */
-	public function apply_parent_filter( \WP_Query $query ): void {
+	public function apply_list_filters( \WP_Query $query ): void {
 		if ( ! is_admin() || ! $query->is_main_query() ) {
 			return;
 		}
@@ -147,14 +380,42 @@ class Card_Submission_Admin {
 		if ( ! $screen || 'edit' !== $screen->base || Post_Type::CARD_SUBMISSION_POST_TYPE !== $screen->post_type ) {
 			return;
 		}
-		if ( empty( $_GET['vce_parent_card'] ) ) {
-			return;
+
+		if ( ! empty( $_GET['vce_parent_card'] ) ) {
+			$parent = absint( wp_unslash( $_GET['vce_parent_card'] ) );
+			if ( $parent > 0 && Post_Type::POST_TYPE === get_post_type( $parent ) ) {
+				$query->set( 'post_parent', $parent );
+			}
 		}
-		$parent = absint( wp_unslash( $_GET['vce_parent_card'] ) );
-		if ( $parent <= 0 || Post_Type::POST_TYPE !== get_post_type( $parent ) ) {
-			return;
+
+		if ( ! empty( $_GET['vce_submission_status'] ) ) {
+			$status = sanitize_key( wp_unslash( $_GET['vce_submission_status'] ) );
+			$labels = $this->get_status_labels();
+			if ( isset( $labels[ $status ] ) ) {
+				$meta_query = (array) $query->get( 'meta_query' );
+				if ( 'saved' === $status ) {
+					$meta_query[] = [
+						'relation' => 'OR',
+						[
+							'key'     => Panel_Meta::SUBMISSION_STATUS,
+							'value'   => 'saved',
+							'compare' => '=',
+						],
+						[
+							'key'     => Panel_Meta::SUBMISSION_STATUS,
+							'compare' => 'NOT EXISTS',
+						],
+					];
+				} else {
+					$meta_query[] = [
+						'key'     => Panel_Meta::SUBMISSION_STATUS,
+						'value'   => $status,
+						'compare' => '=',
+					];
+				}
+				$query->set( 'meta_query', $meta_query );
+			}
 		}
-		$query->set( 'post_parent', $parent );
 	}
 
 	/**
@@ -175,16 +436,18 @@ class Card_Submission_Admin {
 	}
 
 	/**
-	 * @param string $name         Select name attribute.
-	 * @param string $element_id   Select id attribute.
-	 * @param int    $selected     Selected post ID.
-	 * @param string $none_label   Label for value 0.
-	 * @param bool   $search_field Show filter field and tall list (submission edit screen only).
+	 * @param string $name       Select name attribute.
+	 * @param string $element_id Select id attribute.
+	 * @param int    $selected   Selected post ID.
+	 * @param string $none_label Label for value 0.
+	 * @param string $context    list|meta-box
 	 */
-	private function render_virtual_card_select( string $name, string $element_id, int $selected, string $none_label, bool $search_field ): void {
-		$cards = $this->get_virtual_cards_for_dropdown();
+	private function render_virtual_card_select( string $name, string $element_id, int $selected, string $none_label, string $context = 'meta-box' ): void {
+		$cards         = $this->get_virtual_cards_for_dropdown();
+		$is_meta_box   = 'meta-box' === $context;
+		$select_class  = $is_meta_box ? 'widefat vce-virtual-card-parent-select' : 'vce-list-filter-select';
 
-		if ( $search_field ) {
+		if ( $is_meta_box ) {
 			echo '<div class="vce-parent-virtual-card-picker">';
 			if ( ! empty( $cards ) ) {
 				printf(
@@ -194,18 +457,20 @@ class Card_Submission_Admin {
 					esc_attr__( 'Search by title…', VCE_TEXT_DOMAIN )
 				);
 			}
+		} else {
+			echo '<label for="' . esc_attr( $element_id ) . '" class="screen-reader-text">' . esc_html__( 'Filter by E-card', VCE_TEXT_DOMAIN ) . '</label>';
 		}
 
 		$size_attr = '';
-		if ( $search_field && ! empty( $cards ) ) {
+		if ( $is_meta_box && ! empty( $cards ) ) {
 			$size_attr = ' size="' . (int) min( 12, max( 4, count( $cards ) + 1 ) ) . '"';
 		}
 
 		printf(
-			'<select name="%1$s" id="%2$s" class="widefat%3$s"%4$s>',
+			'<select name="%1$s" id="%2$s" class="%3$s"%4$s>',
 			esc_attr( $name ),
 			esc_attr( $element_id ),
-			$search_field ? ' vce-virtual-card-parent-select' : '',
+			esc_attr( $select_class ),
 			$size_attr
 		);
 		printf(
@@ -231,24 +496,74 @@ class Card_Submission_Admin {
 			echo '<p class="description">' . esc_html__( 'Create a Virtual Card first—it will appear here.', VCE_TEXT_DOMAIN ) . '</p>';
 		}
 
-		if ( $search_field ) {
+		if ( $is_meta_box ) {
 			echo '</div>';
 		}
 	}
 
 	/**
-	 * Typing filters the virtual card list (meta box only).
-	 *
 	 * @param string $hook_suffix Current admin page hook.
 	 */
-	public function enqueue_parent_picker_script( string $hook_suffix ): void {
-		if ( ! in_array( $hook_suffix, [ 'post.php', 'post-new.php' ], true ) ) {
-			return;
-		}
+	public function enqueue_admin_assets( string $hook_suffix ): void {
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 		if ( ! $screen || Post_Type::CARD_SUBMISSION_POST_TYPE !== $screen->post_type ) {
 			return;
 		}
+
+		if ( in_array( $hook_suffix, [ 'post.php', 'post-new.php' ], true ) ) {
+			wp_enqueue_style(
+				'vce-admin-card-submission-meta',
+				VCE_PLUGIN_URL . 'assets/css/admin-card-submission-meta.css',
+				[],
+				vce_asset_version( 'assets/css/admin-card-submission-meta.css' )
+			);
+			$this->enqueue_parent_picker_script();
+			return;
+		}
+
+		if ( 'edit.php' !== $hook_suffix ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'vce-admin-card-submission',
+			VCE_PLUGIN_URL . 'assets/css/admin-card-submission.css',
+			[],
+			vce_asset_version( 'assets/css/admin-card-submission.css' )
+		);
+
+		wp_enqueue_script(
+			'vce-admin-card-send',
+			VCE_PLUGIN_URL . 'assets/js/admin-card-send.js',
+			[ 'jquery' ],
+			vce_asset_version( 'assets/js/admin-card-send.js' ),
+			true
+		);
+
+		wp_localize_script(
+			'vce-admin-card-send',
+			'vceAdminSend',
+			[
+				'restUrl' => esc_url_raw( rest_url( 'vce/v1/admin-send-email' ) ),
+				'nonce'   => wp_create_nonce( 'wp_rest' ),
+				'i18n'    => [
+					'send'          => __( 'Send', VCE_TEXT_DOMAIN ),
+					'sending'       => __( 'Sending...', VCE_TEXT_DOMAIN ),
+					'sent'          => __( 'Card sent!', VCE_TEXT_DOMAIN ),
+					'failed'        => __( 'Failed to send.', VCE_TEXT_DOMAIN ),
+					'error'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
+					'requiredEmail' => __( 'Please enter recipient email.', VCE_TEXT_DOMAIN ),
+				],
+			]
+		);
+
+		Template::render( 'admin/card-submission-send-modal.php' );
+	}
+
+	/**
+	 * Typing filters the virtual card list (meta box only).
+	 */
+	private function enqueue_parent_picker_script(): void {
 		wp_enqueue_script( 'jquery' );
 		$js = <<<'JS'
 (function($){$(function(){$('.vce-virtual-card-parent-select').each(function(){var $s=$(this);$s.data('vceAllOptions',$s.html());});$(document).on('input','.vce-virtual-card-parent-filter',function(){var q=$(this).val().toLowerCase().trim();var $w=$(this).closest('.vce-parent-virtual-card-picker');var $sel=$w.find('.vce-virtual-card-parent-select');var all=$sel.data('vceAllOptions');var v=$sel.val();if(!q){$sel.html(all).val(v);return;}var $t=$('<select>'+all+'</select>');$sel.empty();$t.find('option').each(function(){var $o=$(this),val=$o.val(),text=$o.text();if(val==='0'||text.toLowerCase().indexOf(q)!==-1){$sel.append($('<option></option>').val(val).text(text));}});if($sel.find('option[value="'+v+'"]').length){$sel.val(v);}});});})(jQuery);
@@ -262,7 +577,7 @@ JS;
 	public function add_parent_meta_box(): void {
 		add_meta_box(
 			'vce_submission_parent',
-			__( 'Parent virtual card', VCE_TEXT_DOMAIN ),
+			__( 'Parent E-card', VCE_TEXT_DOMAIN ),
 			[ $this, 'render_parent_meta_box' ],
 			Post_Type::CARD_SUBMISSION_POST_TYPE,
 			'side',
@@ -280,7 +595,7 @@ JS;
 			'vce_post_parent',
 			(int) $post->post_parent,
 			__( '— Select —', VCE_TEXT_DOMAIN ),
-			true
+			'meta-box'
 		);
 	}
 
@@ -319,6 +634,11 @@ JS;
 		add_action( 'save_post', [ $this, 'save_parent_meta_box' ], 10, 2 );
 	}
 
+	/**
+	 * @param array    $actions Row actions.
+	 * @param \WP_Post $post    Post.
+	 * @return array
+	 */
 	public function add_send_row_action( $actions, $post ) {
 		if ( Post_Type::CARD_SUBMISSION_POST_TYPE !== $post->post_type ) {
 			return $actions;
@@ -334,75 +654,4 @@ JS;
 		);
 		return $actions;
 	}
-
-	public function enqueue_admin_send_script( $hook_suffix ): void {
-		if ( 'edit.php' !== $hook_suffix ) {
-			return;
-		}
-		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		if ( ! $screen || Post_Type::CARD_SUBMISSION_POST_TYPE !== $screen->post_type ) {
-			return;
-		}
-
-		wp_enqueue_script(
-			'vce-admin-card-send',
-			VCE_PLUGIN_URL . 'assets/js/admin-card-send.js',
-			[ 'jquery' ],
-			vce_asset_version( 'assets/js/admin-card-send.js' ),
-			true
-		);
-
-		wp_localize_script(
-			'vce-admin-card-send',
-			'vceAdminSend',
-			[
-				'restUrl' => esc_url_raw( rest_url( 'vce/v1/admin-send-email' ) ),
-				'nonce'   => wp_create_nonce( 'wp_rest' ),
-				'i18n'    => [
-					'send'          => __( 'Send', VCE_TEXT_DOMAIN ),
-					'sending'       => __( 'Sending...', VCE_TEXT_DOMAIN ),
-					'sent'          => __( 'Card sent!', VCE_TEXT_DOMAIN ),
-					'failed'        => __( 'Failed to send.', VCE_TEXT_DOMAIN ),
-					'error'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
-					'requiredEmail' => __( 'Please enter recipient email.', VCE_TEXT_DOMAIN ),
-				],
-			]
-		);
-		?>
-		<style>
-		.vce-send-modal { display:none; position:fixed; z-index:100000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); }
-		.vce-send-modal.open { display:block; }
-		.vce-send-modal-content { background:#fff; margin:10% auto; max-width:450px; padding:24px; border-radius:8px; box-shadow:0 5px 30px rgba(0,0,0,0.3); }
-		.vce-send-modal-content h3 { margin:0 0 16px; }
-		.vce-send-modal-content label { display:block; font-weight:600; margin-bottom:4px; }
-		.vce-send-modal-content input,
-		.vce-send-modal-content textarea { width:100%; margin-bottom:12px; }
-		.vce-send-modal-actions { display:flex; gap:8px; justify-content:flex-end; }
-		.vce-send-status { margin:8px 0 0; font-size:13px; }
-		</style>
-
-		<div class="vce-send-modal" id="vce-send-modal">
-			<div class="vce-send-modal-content">
-				<h3><?php esc_html_e( 'Send Virtual Card', VCE_TEXT_DOMAIN ); ?></h3>
-				<form id="vce-send-form">
-					<label for="vce-admin-email"><?php esc_html_e( 'Recipient Email', VCE_TEXT_DOMAIN ); ?> *</label>
-					<input type="email" id="vce-admin-email" required />
-
-					<label for="vce-admin-sender"><?php esc_html_e( 'Sender Name', VCE_TEXT_DOMAIN ); ?></label>
-					<input type="text" id="vce-admin-sender" />
-
-					<label for="vce-admin-message"><?php esc_html_e( 'Message', VCE_TEXT_DOMAIN ); ?></label>
-					<textarea id="vce-admin-message" rows="3"></textarea>
-
-					<div class="vce-send-modal-actions">
-						<button type="button" class="button" id="vce-send-cancel"><?php esc_html_e( 'Cancel', VCE_TEXT_DOMAIN ); ?></button>
-						<button type="submit" class="button button-primary" id="vce-send-submit"><?php esc_html_e( 'Send', VCE_TEXT_DOMAIN ); ?></button>
-					</div>
-					<p class="vce-send-status" id="vce-send-status" style="display:none;"></p>
-				</form>
-			</div>
-		</div>
-		<?php
-	}
-
 }

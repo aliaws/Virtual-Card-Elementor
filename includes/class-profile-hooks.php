@@ -116,10 +116,12 @@ class Profile_Hooks {
 			unset( $menu_items['customer-logout'] );
 			$menu_items['account-details'] = 'Edit Account';
             $menu_items['edit_profile_picture'] = 'Edit Profile Picture';
+			$menu_items['my-submissions'] = 'My Submissions';
 			$menu_items['customer-logout'] = $logout;
 		} else {
 			$menu_items['account-details'] = 'Edit Account';
             $menu_items['edit_profile_picture'] = 'Edit Profile Picture';
+			$menu_items['my-submissions'] = 'My Submissions';
 		}
 
 		return $menu_items;

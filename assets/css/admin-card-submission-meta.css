@@ -1,0 +1,11 @@
+/**
+ * Admin: submission edit screen — parent E-card meta box only.
+ */
+
+body.post-type-card_submission .vce-parent-virtual-card-picker {
+	margin: 0;
+}
+
+body.post-type-card_submission .vce-parent-virtual-card-picker .vce-virtual-card-parent-filter {
+	margin-bottom: 8px;
+}

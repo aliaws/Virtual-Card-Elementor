@@ -40,13 +40,13 @@ if ( false === $saved_json ) {
 	data-saved-layers="<?php echo esc_attr( $saved_json ); ?>"
 	data-default-font="<?php echo esc_attr( $editor_font ); ?>"
 >
+	<?php // Checkout-style success/error banner (filled by showPageNotice in JS). ?>
+	<div class="vce-editor-notice-wrap" data-vce-editor-notice-wrap hidden aria-live="polite"></div>
+
 	<div class="vce-panel-editor__toolbar" role="toolbar" aria-label="<?php echo esc_attr__( 'Card editor tools', VCE_TEXT_DOMAIN ); ?>">
 		<div class="vce-panel-editor__toolbar-main">
 			<div class="vce-panel-editor__toolbar-row vce-panel-editor__toolbar-row--actions">
 				<div class="vce-panel-editor__actions">
-					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
-						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
-					</button>
 					<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--ghost" data-vce-add-text>
 						<?php esc_html_e( 'Add text', VCE_TEXT_DOMAIN ); ?>
 					</button>
@@ -54,7 +54,10 @@ if ( false === $saved_json ) {
 						<?php esc_html_e( 'Save submission', VCE_TEXT_DOMAIN ); ?>
 					</button>
 					<button type="button" class="button button-secondary vce-panel-editor__btn" data-vce-save-send>
-						<?php esc_html_e( 'Save & Send', VCE_TEXT_DOMAIN ); ?>
+						<?php esc_html_e( 'Schedule or Send', VCE_TEXT_DOMAIN ); ?>
+					</button>
+					<button type="button" class="button button-primary vce-panel-editor__btn vce-panel-editor__btn--review" data-vce-final-review>
+						<?php esc_html_e( 'Final review', VCE_TEXT_DOMAIN ); ?>
 					</button>
 				</div>
 				<button type="button" class="button vce-panel-editor__btn vce-panel-editor__btn--danger" data-vce-delete-layer disabled>
@@ -126,8 +129,8 @@ if ( false === $saved_json ) {
 				</span>
 			</label>
 			<label class="vce-panel-editor__field vce-panel-editor__field--bg">
-				<span class="vce-panel-editor__field-label"><?php esc_html_e( 'Text background', VCE_TEXT_DOMAIN ); ?></span>
 				<span class="vce-panel-editor__color-tool">
+					<span class="vce-panel-editor__field-label"><?php esc_html_e( 'Text background', VCE_TEXT_DOMAIN ); ?></span>
 					<label class="vce-panel-editor__color-hit" title="<?php echo esc_attr__( 'Pick text background color', VCE_TEXT_DOMAIN ); ?>">
 						<span class="vce-sr-only"><?php esc_html_e( 'Text background color', VCE_TEXT_DOMAIN ); ?></span>
 						<input
@@ -190,56 +193,125 @@ if ( false === $saved_json ) {
 
 	<div class="vce-email-form" data-vce-email-form hidden>
 		<div class="vce-email-form__inner">
+			<?php // Validation errors for Schedule-or-Send (top of form, auto-dismiss). ?>
+			<p class="vce-email-form__alert" data-vce-email-alert hidden role="alert"></p>
 			<p class="vce-email-form__field">
+				<label for="vce-send-mode"><?php esc_html_e( 'When to send', VCE_TEXT_DOMAIN ); ?></label>
+				<select id="vce-send-mode" data-vce-send-mode class="widefat">
+					<option value="now"><?php esc_html_e( 'Now', VCE_TEXT_DOMAIN ); ?></option>
+					<option value="schedule"><?php esc_html_e( 'Schedule', VCE_TEXT_DOMAIN ); ?></option>
+				</select>
+			</p>
+			<div class="vce-email-form__field vce-email-form__field--recipient">
 				<label for="vce-recipient-email"><?php esc_html_e( 'Recipient Email', VCE_TEXT_DOMAIN ); ?> *</label>
-				<input type="email" id="vce-recipient-email" data-vce-recipient-email class="widefat" required />
+				<?php // position:relative wrapper — plugin suggestions are position:absolute below input. ?>
+				<div class="vce-email-form__recipient-wrap">
+					<?php
+					/*
+					 * type=text + extension ignore attrs: reduce Bitwarden/Chrome login autofill.
+					 * readonly until focus (JS): further discourages password-manager popups.
+					 * ul must be a sibling inside this div (invalid inside span/p breaks positioning).
+					 */
+					?>
+					<input
+						type="text"
+						id="vce-recipient-email"
+						data-vce-recipient-email
+						class="widefat"
+						required
+						autocomplete="off"
+						autocorrect="off"
+						autocapitalize="off"
+						spellcheck="false"
+						inputmode="email"
+						name="vce-recipient-field"
+						data-form-type="other"
+						data-bwignore="true"
+						data-lpignore="true"
+						data-1p-ignore="true"
+						data-dashlane-ignore="true"
+						data-protonpass-ignore="true"
+						readonly
+						aria-autocomplete="list"
+						aria-controls="vce-recipient-suggestions"
+						aria-expanded="false"
+					/>
+					<?php // Populated by fetchRecipientSuggestions(); not browser autocomplete. ?>
+					<ul id="vce-recipient-suggestions" class="vce-email-form__suggestions" data-vce-recipient-suggestions role="listbox" aria-hidden="true"></ul>
+				</div>
+			</div>
+			<p class="vce-email-form__field vce-email-form__field--schedule" data-vce-schedule-field hidden>
+				<label for="vce-schedule-timezone"><?php esc_html_e( 'Timezone', VCE_TEXT_DOMAIN ); ?></label>
+				<?php // Labels built at render time (DST-aware); values are IANA ids. ?>
+				<select id="vce-schedule-timezone" data-vce-schedule-timezone class="widefat">
+					<option value="">
+						<?php
+						printf(
+							/* translators: %s: WordPress site timezone */
+							esc_html__( 'Use site timezone (%s)', VCE_TEXT_DOMAIN ),
+							esc_html( wp_timezone_string() ?: 'UTC' )
+						);
+						?>
+					</option>
+					<?php
+					$schedule_timezone_options = $schedule_timezone_options ?? \Virtual_Card_Elementor\Schedule_Timezone::dropdown_choices();
+					foreach ( $schedule_timezone_options as $tz_value => $tz_label ) :
+						?>
+						<option value="<?php echo esc_attr( $tz_value ); ?>"><?php echo esc_html( $tz_label ); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</p>
+			<p class="vce-email-form__field vce-email-form__field--schedule" data-vce-schedule-field hidden>
+				<label for="vce-scheduled-at"><?php esc_html_e( 'Schedule date & time', VCE_TEXT_DOMAIN ); ?> *</label>
+				<input type="datetime-local" id="vce-scheduled-at" data-vce-scheduled-at class="widefat" />
 			</p>
 			<p class="vce-email-form__field">
 				<label for="vce-sender-name"><?php esc_html_e( 'Your Name', VCE_TEXT_DOMAIN ); ?></label>
-				<input type="text" id="vce-sender-name" data-vce-sender-name class="widefat" />
+				<input type="text" id="vce-sender-name" data-vce-sender-name class="widefat" autocomplete="off" />
 			</p>
 			<p class="vce-email-form__field">
 				<label for="vce-send-message"><?php esc_html_e( 'Message', VCE_TEXT_DOMAIN ); ?></label>
 				<textarea id="vce-send-message" data-vce-send-message class="widefat" rows="3"></textarea>
 			</p>
 			<div class="vce-email-form__actions">
-				<button type="button" class="button button-primary" data-vce-send-email><?php esc_html_e( 'Send', VCE_TEXT_DOMAIN ); ?></button>
+				<button type="button" class="button button-primary" data-vce-send-email><?php esc_html_e( 'Schedule or Send', VCE_TEXT_DOMAIN ); ?></button>
 				<button type="button" class="button" data-vce-cancel-email><?php esc_html_e( 'Cancel', VCE_TEXT_DOMAIN ); ?></button>
 			</div>
-			<p class="vce-email-form__status" data-vce-email-status hidden></p>
 		</div>
 	</div>
 
-	<div class="vce-panel-editor__stage-outer">
-		<div class="vce-panel-editor__stage" data-vce-stage>
-			<div class="vce-panel-editor__stage-inner" data-vce-stage-inner>
-				<div class="vce-panel-editor__canvas-wrap" data-vce-canvas-wrap>
-					<canvas class="vce-panel-editor__fabric" data-vce-fabric-canvas width="800" height="600"></canvas>
+	<div class="vce-panel-editor__workspace">
+		<div class="vce-panel-editor__filmstrip-wrap">
+			<p class="vce-panel-editor__filmstrip-title"><?php esc_html_e( 'Panels', VCE_TEXT_DOMAIN ); ?></p>
+			<ul class="vce-panel-editor__filmstrip" data-vce-filmstrip>
+				<?php foreach ( $panels_data as $index => $p ) : ?>
+					<li>
+						<button
+							type="button"
+							class="vce-panel-editor__thumb<?php echo 0 === (int) $index ? ' is-active' : ''; ?>"
+							data-vce-thumb
+							data-index="<?php echo esc_attr( (string) $index ); ?>"
+							aria-label="<?php echo esc_attr( sprintf( /* translators: %d: panel number */ __( 'Panel %d', VCE_TEXT_DOMAIN ), (int) $index + 1 ) ); ?>"
+							aria-pressed="<?php echo 0 === (int) $index ? 'true' : 'false'; ?>"
+						>
+							<?php if ( ! empty( $p['thumb'] ) ) : ?>
+								<img src="<?php echo esc_url( $p['thumb'] ); ?>" alt="" width="80" height="80" loading="lazy" />
+							<?php endif; ?>
+						</button>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+
+		<div class="vce-panel-editor__stage-outer">
+			<div class="vce-panel-editor__stage" data-vce-stage>
+				<div class="vce-panel-editor__stage-inner" data-vce-stage-inner>
+					<div class="vce-panel-editor__canvas-wrap" data-vce-canvas-wrap>
+						<canvas class="vce-panel-editor__fabric" data-vce-fabric-canvas width="800" height="600"></canvas>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
-
-	<div class="vce-panel-editor__filmstrip-wrap">
-		<p class="vce-panel-editor__filmstrip-title"><?php esc_html_e( 'Panels', VCE_TEXT_DOMAIN ); ?></p>
-		<ul class="vce-panel-editor__filmstrip" data-vce-filmstrip>
-			<?php foreach ( $panels_data as $index => $p ) : ?>
-				<li>
-					<button
-						type="button"
-						class="vce-panel-editor__thumb<?php echo 0 === (int) $index ? ' is-active' : ''; ?>"
-						data-vce-thumb
-						data-index="<?php echo esc_attr( (string) $index ); ?>"
-						aria-label="<?php echo esc_attr( sprintf( /* translators: %d: panel number */ __( 'Panel %d', VCE_TEXT_DOMAIN ), (int) $index + 1 ) ); ?>"
-						aria-pressed="<?php echo 0 === (int) $index ? 'true' : 'false'; ?>"
-					>
-						<?php if ( ! empty( $p['thumb'] ) ) : ?>
-							<img src="<?php echo esc_url( $p['thumb'] ); ?>" alt="" width="80" height="80" loading="lazy" />
-						<?php endif; ?>
-					</button>
-				</li>
-			<?php endforeach; ?>
-		</ul>
 	</div>
 
 	<div class="vce-preview-modal vce-preview-modal--fullpage" data-vce-preview-modal hidden>
