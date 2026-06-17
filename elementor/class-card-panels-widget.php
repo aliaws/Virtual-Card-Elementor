@@ -10,6 +10,8 @@ namespace Virtual_Card_Elementor\Elementor;
 use Elementor\Controls_Manager;
 use Elementor\Widget_Base;
 use Virtual_Card_Elementor\Panel_Meta;
+use Virtual_Card_Elementor\Schedule_Timezone;
+use Virtual_Card_Elementor\Submission_Notice;
 use Virtual_Card_Elementor\Template;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -355,23 +357,62 @@ class Card_Panels_Widget extends Widget_Base {
 
 			self::enqueue_editor_google_font( $font_key );
 
+			$current_user = wp_get_current_user();
+			$fallback_sender   = is_user_logged_in() ? ( $current_user->display_name ?: $current_user->user_login ) : '';
+			// Saved Schedule-or-Send values for edit (?id=) — passed to JS as submissionDispatch.
+			$submission_dispatch = [
+				'recipientEmail'    => '',
+				'sendMode'          => 'now',
+				'scheduledAt'       => '',
+				'scheduledTimezone' => '',
+				'senderName'        => $fallback_sender,
+				'message'           => '',
+				'autoOpenForm'      => false,
+			];
+			if ( $submission_id > 0 && $draft_submission instanceof \WP_Post ) {
+				$submission_dispatch = Panel_Meta::get_submission_dispatch( $submission_id, $fallback_sender );
+			}
+			$is_edit_submission = $submission_id > 0
+				&& isset( $_GET['id'] )
+				&& absint( $_GET['id'] ) === $submission_id
+				&& $draft_submission instanceof \WP_Post;
+
+			// Consume WordPress transient notice (AJAX also returns notice in REST JSON).
+			$pending_notice = $user_id ? Submission_Notice::get_and_clear( $user_id ) : null;
+
 			$editor_localize = [
 				'defaultFont'  => $font_key,
 				'fontStacks'   => self::get_font_stacks_for_js(),
+				'currentUser'  => [
+					'displayName' => is_user_logged_in() ? ( $current_user->display_name ?: $current_user->user_login ) : '',
+				],
+				'submissionDispatch' => $submission_dispatch,
+				'siteTimezone'       => wp_timezone_string() ?: 'UTC', // Default when dropdown is empty.
+				// ?id= edit: keep form open after success; create: reset + close form.
+				'isEditSubmission'   => $is_edit_submission,
+				'pendingNotice'      => $pending_notice,
 				'submissionApi' => [
 					'endpoint'      => esc_url_raw( rest_url( 'vce/v1/submission' ) ),
 					'submission_id' => $submission_id,
 					'nonce'         => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
 				],
+				'ajaxUrl'          => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
+				'recipientAjax'    => [
+					'action' => 'vce_recipient_emails',
+					'nonce'  => is_user_logged_in() ? wp_create_nonce( 'vce_recipient_emails' ) : '',
+				],
 				'emailApi' => [
-					'endpoint' => esc_url_raw( rest_url( 'vce/v1/send-email' ) ),
+					'endpoint'          => esc_url_raw( rest_url( 'vce/v1/send-email' ) ),
+					'recipientEndpoint' => esc_url_raw( rest_url( 'vce/v1/recipient-emails' ) ),
 				],
 				'i18n'         => [
 					'defaultText'         => __( 'Your text', VCE_TEXT_DOMAIN ),
 					'finalReview'         => __( 'Final review', VCE_TEXT_DOMAIN ),
 					'saveSubmission'      => __( 'Save submission', VCE_TEXT_DOMAIN ),
 					'savingSubmission'    => __( 'Saving…', VCE_TEXT_DOMAIN ),
-					'submissionSaved'     => __( 'Submission saved. Opening preview…', VCE_TEXT_DOMAIN ),
+					'submissionSaved'     => __( 'Submission saved successfully!', VCE_TEXT_DOMAIN ),
+					'submissionCreated'   => __( 'Submission created successfully!', VCE_TEXT_DOMAIN ),
+					'submissionUpdated'   => __( 'Submission updated successfully!', VCE_TEXT_DOMAIN ),
 					'submissionFailed'    => __( 'Could not save submission.', VCE_TEXT_DOMAIN ),
 					'closePreview'        => __( 'Close', VCE_TEXT_DOMAIN ),
 					'previewLoading'      => __( 'Building preview…', VCE_TEXT_DOMAIN ),
@@ -382,12 +423,16 @@ class Card_Panels_Widget extends Widget_Base {
 						'You have text on this card that is only saved in this browser. Leave anyway?',
 						VCE_TEXT_DOMAIN
 					),
-					'sendEmail'           => __( 'Send', VCE_TEXT_DOMAIN ),
+					'sendEmail'           => __( 'Schedule or Send', VCE_TEXT_DOMAIN ),
 					'emailSent'           => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
+					'scheduledSuccess'    => __( 'E-Card scheduled successfully!', VCE_TEXT_DOMAIN ),
 					'emailFailed'         => __( 'Could not send card.', VCE_TEXT_DOMAIN ),
 					'recipientRequired'   => __( 'Please enter a recipient email.', VCE_TEXT_DOMAIN ),
+					// Shown when type=text recipient field fails client-side format check.
+					'recipientInvalid'    => __( 'Please enter a valid email address.', VCE_TEXT_DOMAIN ),
 					'preparingPreview'    => __( 'Building preview...', VCE_TEXT_DOMAIN ),
 					'sendingEmail'        => __( 'Sending...', VCE_TEXT_DOMAIN ),
+					'scheduling'          => __( 'Scheduling...', VCE_TEXT_DOMAIN ),
 				],
 			];
 			if ( \Virtual_Card_Elementor\Debug_Log::vce_debug_client_enabled() ) {
@@ -398,16 +443,23 @@ class Card_Panels_Widget extends Widget_Base {
 			}
 			wp_localize_script( 'vce-frontend-panel-editor', 'vcePanelEditor', $editor_localize );
 
+			$saved_schedule_timezone = '';
+			if ( $submission_id > 0 && $draft_submission instanceof \WP_Post ) {
+				// Include stored tz on edit so legacy values stay in the dropdown.
+				$saved_schedule_timezone = Panel_Meta::get_scheduled_timezone_for_input( $submission_id );
+			}
+
 			Template::render(
 				'frontend/card-panels-editor.php',
 				[
-					'post_id'        => (int) $post->ID,
-					'source_card_id' => $source,
-					'ids'            => $ids,
-					'panels_data'    => $panels_data,
-					'saved_layers'   => $saved_layers,
-					'editor_font'    => $font_key,
-					'font_options'   => self::get_font_options_labels(),
+					'post_id'                 => (int) $post->ID,
+					'source_card_id'          => $source,
+					'ids'                     => $ids,
+					'panels_data'             => $panels_data,
+					'saved_layers'            => $saved_layers,
+					'editor_font'             => $font_key,
+					'font_options'            => self::get_font_options_labels(),
+					'schedule_timezone_options' => Schedule_Timezone::dropdown_options( $saved_schedule_timezone ),
 				]
 			);
 			return;

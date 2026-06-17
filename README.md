@@ -100,7 +100,8 @@ If you used an earlier copy of this plugin that stored images under **`_virtual_
 | `SECOND_LEVEL_LABEL_META_KEY` | **`_vce_second_level_label`** | Second-level label (used by `[vce_dynamic_title]`) |
 | `SUBMISSION_SENDER_ID` | **`_vce_sender_id`** | User ID of submission creator |
 | `SUBMISSION_RECEIVER_EMAIL` | **`_vce_receiver_email`** | Recipient email |
-| `SUBMISSION_STATUS` | **`_vce_submission_status`** | `saved`, `sent`, or `viewed` |
+| `SUBMISSION_SCHEDULED_AT` | **`_vce_scheduled_at`** | Scheduled send datetime (MySQL, site timezone); omitted when sending immediately |
+| `SUBMISSION_STATUS` | **`_vce_submission_status`** | `saved`, `scheduled`, `sent`, or `viewed` |
 | `SUBMISSION_SENT_COUNT` | **`_vce_sent_count`** | Per-recipient send counts (array meta) |
 | `SUBMISSION_VIEWED_COUNT` | **`_vce_viewed_count`** | View count |
 | `SUBMISSION_LOG` | **`_vce_submission_log`** | Activity log entries |
@@ -156,10 +157,11 @@ The taxonomy also registers **`show_admin_column`** so WordPress adds its own **
 
 ### Card Submissions admin (`Card_Submission_Admin`)
 
-- Adds **Virtual card** column (sortable by **`post_parent`**) and **Final view** link (`/?post_type=card_submission&p=ID`).
-- Parent filter dropdown and searchable parent selector meta box on edit screen.
-- **Send** row action opens modal → **`POST /wp-json/vce/v1/admin-send-email`** (`assets/js/admin-card-send.js`).
-- Saves **`post_parent`** only when parent is type **`virtual_card`**.
+- List table columns: **Virtual card** (sortable by **`post_parent`**), **Sender** (linked user from **`_vce_sender_id`**, same as meta box), **Receiver Email**, **Status** (colored badge), **Preview Link** (front-end permalink).
+- Filters (above **Filter** button): **All statuses** / Saved / Scheduled / Sent / Viewed, and **All E-cards** / parent virtual card (`pre_get_posts` on **`vce_parent_card`** and **`vce_submission_status`**).
+- Searchable parent selector meta box on the submission edit screen; saves **`post_parent`** only when parent is type **`virtual_card`**.
+- **Send** row action (status **`saved`**) opens modal from **`templates/admin/card-submission-send-modal.php`** → **`POST /wp-json/vce/v1/admin-send-email`** (`assets/js/admin-card-send.js`, **`assets/css/admin-card-submission.css`**).
+- Status badges reuse **`templates/admin/partials/submission-status-badge.php`**.
 
 ### Card Submissions: tracking meta box (`Card_Submission_Meta_Box`)
 
@@ -185,11 +187,14 @@ When the current post is a **`card_submission`**, the widget resolves panel imag
 
 Use the widget on templates where the main queried post is the desired **`virtual_card`** or a **`card_submission`** single.
 
-- Editor UI is rendered by **`templates/frontend/card-panels-editor.php`** and powered by **`assets/js/frontend-panel-editor.js`** (depends on **`fabric`**, **`vce-frontend-panel-renderer`**, and optionally **`vce-debug-client`**). Toolbar: font, size, **text color**, preset swatches, **text background** + clear (**Fabric** `textBackgroundColor`, including per-range selection while editing), bold / italic / underline, filmstrip, **Final review**, **Save submission**, **Save & Send**.
+- Editor UI is rendered by **`templates/frontend/card-panels-editor.php`** and powered by **`assets/js/frontend-panel-editor.js`** (depends on **`fabric`**, **`vce-frontend-panel-renderer`**, and optionally **`vce-debug-client`**). Toolbar: font, size, **text color**, preset swatches, **text background** + clear (**Fabric** `textBackgroundColor`, including per-range selection while editing), bold / italic / underline, filmstrip, **Final review**, **Save submission**, **Schedule or Send**.
 - **Final review** button is positioned last in the toolbar action group.
 - Unsaved in-browser text (before **Save submission**) is **not** persisted across a full page reload; the toolbar may warn on leave when local draft content exists.
 - **Saved drafts** are stored as **`card_submission`** posts with status meta **`saved`** (or **`scheduled`**). Layers live in **`_vce_submission_layers`**; the virtual card’s panel attachments are never modified.
 - Save endpoint: **`POST /wp-json/vce/v1/submission`** (`Card_Submission_Rest`). JSON body: **`parentId`**, **`layers`**, and optional **`submission_id`**. When **`submission_id`** is `0` or omitted, a new **`card_submission`** is created; otherwise the existing post is updated (layers + **`post_modified`**). Response includes **`id`**, **`preview_url`**, **`url`**, and **`edit_url`**.
+- **Schedule or Send** form: **When to send** = **Now** or **Schedule** (shows **`datetime-local`**). **Your Name** defaults to the logged-in user’s display name. **Recipient Email** uses AJAX autocomplete (`admin-ajax.php?action=vce_recipient_emails`) over unique **`_vce_receiver_email`** values from the current user’s past submissions (REST fallback: **`GET /wp-json/vce/v1/recipient-emails`**).
+- Dispatch save: same submission endpoint with **`dispatch: true`**, **`recipientEmail`**, **`sendMode`** (`now` | `schedule`), and optional **`scheduledAt`**. **Schedule** sets status **`scheduled`** and stores **`_vce_scheduled_at`**; **Now** does not persist a schedule time (meta is cleared on send). Immediate send still uses **`POST /wp-json/vce/v1/send-email`** after save.
+- **`Submission_Scheduler`**: WP-Cron every 5 minutes sends due **`scheduled`** submissions via **`Card_Email_Rest::send_submission_email()`**.
 - After each successful save, the plugin stores the post ID in user option **`LAST_DRAFT_SUBMISSION_{user_id}`** so the editor can resume the most recently saved draft. Sending email (**`Card_Email_Rest`**) clears that option for the current user.
 - **`_vce_submission_layers`** is a map keyed by panel index (`"0"`, `"1"`, …). Each value holds Fabric **`objects`** plus **`baseW`** / **`baseH`** (editor canvas size when saved) so coordinates scale in preview/submission.
 - **Loading a draft in the editor** (`Card_Panels_Widget::render()`):
@@ -197,7 +202,7 @@ Use the widget on templates where the main queried post is the desired **`virtua
   2. Otherwise, if the user has **`LAST_DRAFT_SUBMISSION_{user_id}`**, that submission is loaded.
   3. The widget temporarily treats the submission as the current post so panel images come from the parent **`virtual_card`** and layers from **`_vce_submission_layers`**.
 - The front-end editor is shown when the loaded submission’s status is **`saved`** or **`scheduled`** and **`vce_can_use_front_editor()`** is true (not only when the queried post is a **`virtual_card`** with the widget’s “enable front editor” setting). **`submission_id`** is passed to JS as **`vcePanelEditor.submissionApi.submission_id`** so subsequent saves update the same post.
-- **My Submissions (WooCommerce My Account**, endpoint **`my-submissions`**, template **`templates/frontend/my-submissions.php`**): logged-in users see a numbered table of their **`card_submission`** posts (by **`_vce_submission_sender_id`**). Status badges: **Saved**, **Scheduled**, **Sent**, **Viewed**. **Edit** (saved/scheduled only) links to the parent virtual card with **`?id={submission_id}`**. **Preview** links open the submission’s front-end view (sent/viewed).
+- **My Submissions (WooCommerce My Account**, endpoint **`my-submissions`**, template **`templates/frontend/my-submissions.php`**): logged-in users see a numbered table of their **`card_submission`** posts (by **`_vce_submission_sender_id`**). Columns include **Receiver Email** (`_vce_receiver_email`). Status badges: **Saved**, **Scheduled**, **Sent**, **Viewed**. **Edit** (saved/scheduled only) links to the parent virtual card with **`?id={submission_id}`**. **Preview** links open the submission’s front-end view (sent/viewed).
 
 Set **Query ID** to **`custom_e_cards`** on Posts / Loop Grid / Loop Carousel / Archive Posts / Portfolio widgets that list **`virtual_card`** posts.
 
@@ -242,8 +247,11 @@ Invalid term IDs are ignored. **`include_children`** is enabled for hierarchical
 
 - **`POST /wp-json/vce/v1/send-email`** — front-end send (public; restrict at edge if needed).
 - **`POST /wp-json/vce/v1/admin-send-email`** — admin send from submissions list (`manage_options`).
+- **`GET /wp-json/vce/v1/recipient-emails`** — logged-in recipient autocomplete (`?search=`).
+- **`wp_ajax_vce_recipient_emails`** — same data for front-end autocomplete (preferred on cached pages).
+- Shared send logic: **`Card_Email_Rest::send_submission_email()`** (REST, admin, and scheduled cron).
 - HTML template: **`templates/emails/card-email.php`**.
-- Updates submission meta (receiver, status **`sent`**, send counts) and logs via **`Submission_Logger`**.
+- Updates submission meta (receiver, status **`sent`**, clears **`_vce_scheduled_at`**, send counts) and logs via **`Submission_Logger`**.
 
 ### View tracking (`Card_View_Rest`)
 
@@ -358,7 +366,8 @@ Redirects to **`/pricing/?notice=subscription_required`** (guests to **`/login/`
 
 | Route | Method | Permission | Role |
 |-------|--------|------------|------|
-| **`/wp-json/vce/v1/submission`** | `POST` | Public | Create **`card_submission`**, store **`_vce_submission_layers`**, return preview URLs |
+| **`/wp-json/vce/v1/submission`** | `POST` | Public | Create/update **`card_submission`**, store layers; optional **`dispatch`** + schedule fields |
+| **`/wp-json/vce/v1/recipient-emails`** | `GET` | Logged in | Unique recipient emails for current user’s submissions |
 | **`/wp-json/vce/v1/send-email`** | `POST` | Public | Send submission email to recipient |
 | **`/wp-json/vce/v1/admin-send-email`** | `POST` | `manage_options` | Admin send from submissions list |
 | **`/wp-json/vce/v1/track-view`** | `POST` | Public | Increment view count; update status when **`sent`** |
@@ -380,8 +389,9 @@ Public REST routes should be restricted at the server or edge if the site is exp
 | `includes/class-template.php` | Template loader |
 | `includes/class-debug-log.php` | Diagnostic logging + debug client assets |
 | `includes/class-vce-debug-rest.php` | REST **`vce/v1/debug-client`** |
-| `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** (create/update drafts) |
-| `includes/class-card-email-rest.php` | REST **`vce/v1/send-email`** |
+| `includes/class-card-submission-rest.php` | REST **`vce/v1/submission`** (create/update, dispatch schedule) |
+| `includes/class-card-email-rest.php` | REST send + recipient emails; shared **`send_submission_email()`** |
+| `includes/class-submission-scheduler.php` | WP-Cron: send due scheduled submissions |
 | `admin/class-card-submission-meta-box.php` | Submission status display in admin |
 | `includes/class-template.php` | Template loader |
 | `includes/class-profile-hooks.php` | WooCommerce & UM profile integration hooks |
@@ -390,7 +400,10 @@ Public REST routes should be restricted at the server or edge if the site is exp
 | `admin/class-panel-meta-box.php` | Card Panels + display order meta boxes, save handlers |
 | `admin/class-card-labels-meta-box.php` | Labels & Status meta box (Favorite, First/Second Level Labels) |
 | `admin/class-virtual-card-admin-columns.php` | Virtual Cards list: panels count, WIX ID, category filter, favorite filter |
-| `admin/class-card-submission-admin.php` | Submissions list, final view link, parent filter/meta box |
+| `admin/class-card-submission-admin.php` | Submissions list columns, filters, send modal, parent meta box |
+| `assets/css/admin-card-submission.css` | Admin submissions list + send modal styles |
+| `templates/admin/card-submission-send-modal.php` | Admin send card modal markup |
+| `templates/admin/partials/submission-status-badge.php` | Status pill (list + reusable) |
 | `admin/class-attachment-tags.php` | Attachment Tags field + AJAX + Tagify enqueue |
 | `admin/class-vce-debug-page.php` | **Tools → VCE debug** admin page |
 | `elementor/class-card-panels-widget.php` | Elementor widget |

@@ -826,6 +826,60 @@
 	border-radius: var(--vce-editor-radius);
 	padding: 16px;
 	margin: 12px 0;
+	overflow: visible;
+}
+
+/* Checkout-style page notice (AJAX + WordPress transient on load). */
+.vce-editor-notice-wrap {
+	margin: 0 0 12px;
+}
+
+/* Success/error pill rendered by showPageNotice(). */
+.vce-editor-notice {
+	margin: 0;
+	padding: 12px 16px;
+	border-radius: 4px;
+	font-size: 14px;
+	line-height: 1.5;
+	list-style: none;
+}
+
+.vce-editor-notice--success {
+	background: #ecf7ed;
+	border-left: 4px solid #7ad03a;
+	color: #1d2327;
+}
+
+.vce-editor-notice--error {
+	background: #fcf0f1;
+	border-left: 4px solid #d63638;
+	color: #1d2327;
+}
+
+.vce-email-form__inner {
+	overflow: visible;
+	position: relative;
+}
+
+/* Top-of-form validation messages (Schedule-or-Send). */
+.vce-email-form__alert {
+	margin: 0 0 12px;
+	padding: 10px 12px;
+	border-radius: 4px;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.vce-email-form__alert--success {
+	background: #ecf7ed;
+	border-left: 4px solid #7ad03a;
+	color: #1d2327;
+}
+
+.vce-email-form__alert--error {
+	background: #fcf0f1;
+	border-left: 4px solid #d63638;
+	color: #1d2327;
 }
 
 .vce-email-form__field {
@@ -845,7 +899,65 @@
 	align-items: center;
 }
 
-.vce-email-form__status {
-	margin: 8px 0 0;
+.vce-email-form__field--recipient {
+	position: relative;
+	z-index: 2;
+	overflow: visible;
+}
+
+/*
+ * Recipient input + plugin suggestion list.
+ * position:relative here; .vce-email-form__suggestions is absolute below the input.
+ */
+.vce-email-form__recipient-wrap {
+	position: relative;
+	display: block;
+	width: 100%;
+	overflow: visible;
+}
+
+/* Plugin-owned recipient history dropdown (not browser/Bitwarden autofill). */
+.vce-email-form__suggestions {
+	display: none;
+	position: absolute;
+	z-index: 10050;
+	left: 0;
+	right: 0;
+	top: calc(100% + 2px);
+	bottom: auto;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	background: #fff;
+	border: 1px solid var(--vce-editor-border, #c3c4c7);
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.vce-email-form__suggestions.is-open {
+	display: block;
+}
+
+.vce-email-form__suggestions li {
+	margin: 0;
+}
+
+.vce-email-form__suggestions button {
+	display: block;
+	width: 100%;
+	padding: 8px 12px;
+	border: 0;
+	background: transparent;
+	color: inherit; /* Avoid theme link/pink styles on suggestion rows. */
+	text-align: left;
 	font-size: 13px;
+	cursor: pointer;
+}
+
+.vce-email-form__suggestions button:hover,
+.vce-email-form__suggestions button:focus {
+	background: #f0f0f1;
+	color: black !important;
 }
