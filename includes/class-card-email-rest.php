@@ -156,8 +156,15 @@ final class Card_Email_Rest {
 			return new WP_Error( 'vce_invalid_email', __( 'Invalid recipient email.', VCE_TEXT_DOMAIN ) );
 		}
 
-		$sender_id = (int) get_post_meta( $submission_id, Panel_Meta::SUBMISSION_SENDER_ID, true );
+		$sender_id   = (int) get_post_meta( $submission_id, Panel_Meta::SUBMISSION_SENDER_ID, true );
 		$sender_user = $sender_id ? get_userdata( $sender_id ) : null;
+		// Cron / scheduled send: use name + message saved at schedule time when not passed in.
+		if ( '' === $sender_name ) {
+			$sender_name = (string) get_post_meta( $submission_id, Panel_Meta::SUBMISSION_SENDER_NAME, true );
+		}
+		if ( '' === $message ) {
+			$message = (string) get_post_meta( $submission_id, Panel_Meta::SUBMISSION_MESSAGE, true );
+		}
 		if ( '' === $sender_name && $sender_user ) {
 			$sender_name = $sender_user->display_name;
 		}
@@ -215,7 +222,8 @@ final class Card_Email_Rest {
 		update_post_meta( $submission_id, Panel_Meta::SUBMISSION_SENT_COUNT, $per_email );
 		update_post_meta( $submission_id, Panel_Meta::SUBMISSION_RECEIVER_EMAIL, $recipient_email );
 		update_post_meta( $submission_id, Panel_Meta::SUBMISSION_STATUS, 'sent' );
-		delete_post_meta( $submission_id, Panel_Meta::SUBMISSION_SCHEDULED_AT );
+		// Scheduled send complete: drop UTC, local time, and timezone meta.
+		Panel_Meta::clear_schedule_meta( $submission_id );
 
 		$parent_id = wp_get_post_parent_id( $submission_id );
 		wp_update_post(
@@ -374,10 +382,26 @@ final class Card_Email_Rest {
 			);
 		}
 
+		$is_new  = filter_var( $request->get_param( 'isNewSubmission' ), FILTER_VALIDATE_BOOLEAN );
+		$message = $is_new
+			? __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN )
+			: __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN );
+
+		// Transient + REST notice for checkout-style banner (send-now final step).
+		$user_id = get_current_user_id();
+		if ( $user_id ) {
+			Submission_Notice::set( $user_id, $message, 'success' );
+		}
+
 		return new WP_REST_Response(
 			[
-				'success' => true,
-				'message' => __( 'E-Card sent successfully!', VCE_TEXT_DOMAIN ),
+				'success'         => true,
+				'message'         => $message,
+				'isNewSubmission' => $is_new,
+				'notice'          => [
+					'message' => $message,
+					'type'    => 'success',
+				],
 			],
 			200
 		);
