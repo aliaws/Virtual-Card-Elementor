@@ -1,5 +1,22 @@
 <div class="wrap vce-gallery-wrap">
 	<h1><?php esc_html_e( 'Card Gallery', VCE_TEXT_DOMAIN ); ?></h1>
+
+	<div class="vce-gallery-filter-bar">
+		<label for="vce-category-filter" class="screen-reader-text"><?php esc_html_e( 'Filter by category', VCE_TEXT_DOMAIN ); ?></label>
+		<select name="vce_category" id="vce-category-filter">
+			<option value=""><?php esc_html_e( 'All Categories', VCE_TEXT_DOMAIN ); ?></option>
+			<?php foreach ( $categories as $cat ) : ?>
+				<option value="<?php echo esc_attr( (string) $cat->term_id ); ?>" <?php selected( $selected_category, $cat->term_id ); ?>>
+					<?php echo esc_html( $cat->name ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<button type="button" class="button" id="vce-gallery-filter-btn"><?php esc_html_e( 'Filter', VCE_TEXT_DOMAIN ); ?></button>
+		<?php if ( $selected_category > 0 ) : ?>
+			<a href="?post_type=virtual_card&page=vce-card-gallery" class="button" id="vce-gallery-reset-btn"><?php esc_html_e( 'Reset Filter', VCE_TEXT_DOMAIN ); ?></a>
+		<?php endif; ?>
+	</div>
+
 	<p class="vce-gallery-count"><?php echo esc_html( sprintf( __( 'Total cards: %d', VCE_TEXT_DOMAIN ), $total ) ); ?></p>
 
 	<?php if ( ! $query->have_posts() ) : ?>

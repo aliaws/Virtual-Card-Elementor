@@ -70,33 +70,37 @@ class Virtual_Card_Gallery_Page {
 	}
 
 	public function render_page(): void {
-		$counts = wp_count_posts( Post_Type::POST_TYPE );
-		$total  = 0;
-		if ( isset( $counts->publish ) ) {
-			$total += (int) $counts->publish;
-		}
-		if ( isset( $counts->draft ) ) {
-			$total += (int) $counts->draft;
-		}
-		if ( isset( $counts->pending ) ) {
-			$total += (int) $counts->pending;
-		}
-		if ( isset( $counts->future ) ) {
-			$total += (int) $counts->future;
-		}
-		if ( isset( $counts->private ) ) {
-			$total += (int) $counts->private;
-		}
+		$selected_category = isset( $_GET['vce_category'] ) ? (int) $_GET['vce_category'] : 0;
 
-		$raw = get_posts(
+		$categories = get_terms(
 			[
-				'post_type'      => Post_Type::POST_TYPE,
-				'post_status'    => 'any',
-				'posts_per_page' => -1,
-				'orderby'        => 'title',
-				'order'          => 'ASC',
+				'taxonomy'   => 'virtual_card_category',
+				'hide_empty' => false,
+				'orderby'    => 'name',
+				'order'      => 'ASC',
 			]
 		);
+
+		$args = [
+			'post_type'      => Post_Type::POST_TYPE,
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+		];
+
+		if ( $selected_category > 0 ) {
+			$args['tax_query'] = [
+				[
+					'taxonomy'         => 'virtual_card_category',
+					'field'            => 'term_id',
+					'terms'            => $selected_category,
+					'include_children' => true,
+				],
+			];
+		}
+
+		$raw = get_posts( $args );
 
 		usort(
 			$raw,
@@ -110,16 +114,19 @@ class Virtual_Card_Gallery_Page {
 			}
 		);
 
-		$query            = new \WP_Query();
-		$query->posts     = $raw;
+		$total             = count( $raw );
+		$query             = new \WP_Query();
+		$query->posts      = $raw;
 		$query->post_count = count( $raw );
 
 		Template::render(
 			'admin/virtual-card-gallery.php',
 			[
-				'query'      => $query,
-				'total'      => $total,
-				'order_meta' => Panel_Meta::ORDER_META_KEY,
+				'query'              => $query,
+				'total'              => $total,
+				'order_meta'         => Panel_Meta::ORDER_META_KEY,
+				'categories'         => $categories,
+				'selected_category'  => $selected_category,
 			]
 		);
 	}

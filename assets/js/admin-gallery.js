@@ -27,6 +27,15 @@
 		openModal($btn.data('post-id'), $btn.data('title'), $btn.data('order'));
 	});
 
+	$('#vce-gallery-filter-btn').on('click', function() {
+		var cat = $('#vce-category-filter').val();
+		var url = '?post_type=virtual_card&page=vce-card-gallery';
+		if (cat) {
+			url += '&vce_category=' + encodeURIComponent(cat);
+		}
+		window.location.href = url;
+	});
+
 	$(document).on('click', '.vce-gallery-modal-backdrop, .vce-gallery-modal-close, .vce-gallery-modal-cancel', function() {
 		closeModal();
 	});
